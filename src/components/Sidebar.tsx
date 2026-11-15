@@ -1,5 +1,5 @@
 import { DevicePanel, type DevicePick, type DetectedDevice } from './DevicePanel';
-import { UploadPanel } from './UploadPanel';
+import { ModelUploader } from './ModelUploader';
 import type { SceneContent } from '../data/scene';
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   onDeviceChange: (d: DevicePick) => void;
   sceneContent: SceneContent;
   onSceneChange: (c: SceneContent) => void;
+  flow: boolean;
+  onFlowChange: (v: boolean) => void;
 }
 
 export function Sidebar({
@@ -20,6 +22,8 @@ export function Sidebar({
   onDeviceChange,
   sceneContent,
   onSceneChange,
+  flow,
+  onFlowChange,
 }: Props) {
   return (
     <aside className={`app-sidebar ${open ? 'open' : ''}`} aria-hidden={!open}>
@@ -43,7 +47,12 @@ export function Sidebar({
         onChange={onDeviceChange}
       />
 
-      <UploadPanel content={sceneContent} onChange={onSceneChange} />
+      <ModelUploader
+        content={sceneContent}
+        onChange={onSceneChange}
+        flow={flow}
+        onFlowChange={onFlowChange}
+      />
 
       <nav className="sidebar-nav">
         <a href="#top" onClick={onClose}>Overview</a>

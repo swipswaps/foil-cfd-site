@@ -1,6 +1,18 @@
 import type * as THREE from 'three';
 
+export interface FlowSphere {
+  center: THREE.Vector3;
+  radius: number;
+}
+
 export type SceneContent =
-  | { kind: 'default' }
-  | { kind: 'naca'; code: string }
-  | { kind: 'stl'; geometry: THREE.BufferGeometry; filename: string };
+  | { kind: 'default'; token: number }
+  | { kind: 'naca'; code: string; token: number }
+  | {
+      kind: 'model';
+      object: THREE.Object3D;
+      filename: string;
+      filesize: number;
+      sphere: FlowSphere;
+      token: number;
+    };

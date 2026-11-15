@@ -22,12 +22,15 @@ export default function App() {
   const [devicePick, setDevicePick] = useState<DevicePick>('auto');
   const [detectedDevice, setDetectedDevice] = useState<DetectedDevice>(detectDevice);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sceneContent, setSceneContent] = useState<SceneContent>({ kind: 'default' });
+  const [sceneContent, setSceneContent] = useState<SceneContent>({
+    kind: 'default',
+    token: 0,
+  });
+  const [flow, setFlow] = useState(true);
 
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
 
-  // Continuous auto-detect: updates on resize and orientationchange.
   useEffect(() => {
     const update = () => setDetectedDevice(detectDevice());
     update();
@@ -39,7 +42,6 @@ export default function App() {
     };
   }, []);
 
-  // Reflect effective device on <html> so CSS media queries can rely on it.
   useEffect(() => {
     document.documentElement.setAttribute('data-device', effectiveDevice);
     document.documentElement.setAttribute(
@@ -48,7 +50,6 @@ export default function App() {
     );
   }, [effectiveDevice, sidebarOpen]);
 
-  // Escape closes sidebar
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSidebarOpen(false);
@@ -56,15 +57,6 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
-  // Dispose previous STL geometry when content is replaced or app unmounts.
-  useEffect(() => {
-    return () => {
-      if (sceneContent.kind === 'stl') {
-        sceneContent.geometry.dispose();
-      }
-    };
-  }, [sceneContent]);
 
   return (
     <div className="app-shell">
@@ -81,6 +73,8 @@ export default function App() {
           onDeviceChange={setDevicePick}
           sceneContent={sceneContent}
           onSceneChange={setSceneContent}
+          flow={flow}
+          onFlowChange={setFlow}
         />
         {sidebarOpen && (
           <div
@@ -97,7 +91,7 @@ export default function App() {
               onRetry={backend.probe}
             />
           </div>
-          <Hero content={sceneContent} />
+          <Hero content={sceneContent} flow={flow} />
           <ReadmeSection />
           <ProjectShowcase />
           <footer className="footer">

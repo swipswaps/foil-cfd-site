@@ -7,9 +7,10 @@ import type { SceneContent } from '../data/scene';
 
 interface Props {
   content: SceneContent;
+  flow: boolean;
 }
 
-export function FoilScene({ content }: Props) {
+export function FoilScene({ content, flow }: Props) {
   return (
     <Canvas camera={{ position: [0, 1.5, 5], fov: 45 }}>
       <color attach="background" args={['#0B2545']} />
@@ -20,16 +21,37 @@ export function FoilScene({ content }: Props) {
       {content.kind === 'default' && (
         <>
           <Airfoil />
-          <FlowParticles />
+          {flow && (
+            <FlowParticles key={`flow-d-${content.token}`} mode="planar" />
+          )}
         </>
       )}
+
       {content.kind === 'naca' && (
         <>
           <Airfoil code={content.code} />
-          <FlowParticles />
+          {flow && (
+            <FlowParticles
+              key={`flow-n-${content.token}`}
+              mode="planar"
+            />
+          )}
         </>
       )}
-      {content.kind === 'stl' && <ModelViewer geometry={content.geometry} />}
+
+      {content.kind === 'model' && (
+        <>
+          <ModelViewer object={content.object} />
+          {flow && (
+            <FlowParticles
+              key={`flow-m-${content.token}`}
+              mode="volume"
+              count={3500}
+              flowSphere={content.sphere}
+            />
+          )}
+        </>
+      )}
 
       <OrbitControls enableDamping />
     </Canvas>
