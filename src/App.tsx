@@ -51,6 +51,13 @@ export default function App() {
   }, [effectiveDevice, sidebarOpen]);
 
   useEffect(() => {
+    // +Z / -Z flow only makes sense for 3D models.
+    if (sceneContent.kind !== 'model' && (direction === '+z' || direction === '-z')) {
+      setDirection('+x');
+    }
+  }, [sceneContent.kind, direction]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSidebarOpen(false);
     };

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-template="minimal">
+<html lang="en" data-sidebar="closed" data-device="desktop">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -7,17 +7,6 @@
     <meta name="description" content="FOIL.CFD — CFD, CAD, and 3D tools for engineering research." />
     <meta name="theme-color" content="#06121A" />
     <title>FOIL.CFD</title>
-    <script>
-      (function () {
-        try {
-          var saved = localStorage.getItem('foil-cfd-template');
-          var t = saved === 'cinematic' || saved === 'grid' ? saved : 'minimal';
-          document.documentElement.setAttribute('data-template', t);
-        } catch (e) {
-          document.documentElement.setAttribute('data-template', 'minimal');
-        }
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

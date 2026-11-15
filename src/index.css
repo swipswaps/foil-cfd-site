@@ -146,15 +146,25 @@ a { color: inherit; }
   background: #0B1A24;
   border-right: 1px solid #1E3A4A;
   padding: 1.5rem 1.25rem;
-  transform: translateX(-105%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(-100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
   z-index: 60;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
 }
-.app-sidebar.open { transform: translateX(0); }
+.app-sidebar.open {
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+  opacity: 1;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
 
 .app-frame.device-tablet .app-sidebar { left: calc(50vw - 384px); }
 .app-frame.device-phone .app-sidebar { left: calc(50vw - 195px); }
@@ -795,3 +805,28 @@ a { color: inherit; }
   background: #06121A;
 }
 .toggle-label { user-select: none; }
+
+
+/* Belt-and-braces: hide sidebar before React hydrates */
+html[data-sidebar='closed'] .app-sidebar:not(.open) {
+  transform: translateX(-100%) !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* =========================================================================
+   FLOW APPROXIMATION NOTE
+   ========================================================================= */
+.flow-approx {
+  font-size: 0.6rem;
+  line-height: 1.45;
+  color: #5E8FA8;
+  padding: 0.4rem 0.55rem;
+  margin-top: 0.4rem;
+  background: rgba(94, 143, 168, 0.08);
+  border-left: 2px solid #5E8FA8;
+  border-radius: 0 4px 4px 0;
+}
