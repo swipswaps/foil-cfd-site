@@ -830,3 +830,43 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   border-left: 2px solid #5E8FA8;
   border-radius: 0 4px 4px 0;
 }
+
+.direction-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.3rem; }
+.direction-grid button {
+  border: 1px solid #1E3A4A; background: transparent; color: #94AEBF;
+  font-size: 0.7rem; font-weight: 600; padding: 0.4rem 0;
+  border-radius: 4px; cursor: pointer; font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.direction-grid button:hover { background: #132A38; color: #E2F4FF; }
+.direction-grid button.active { background: #5BC0EB; border-color: #5BC0EB; color: #06121A; }
+.speed-row {
+  display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;
+  font-size: 0.7rem; color: #7FB6D4;
+}
+.speed-row label { flex-shrink: 0; }
+.speed-row input[type='range'] { flex: 1; accent-color: #5BC0EB; height: 4px; }
+.speed-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.65rem; color: #5E8FA8; min-width: 2.4rem; text-align: right;
+}
+.cad-link {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.6rem 0.75rem; border: 1px solid #5BC0EB; border-radius: 6px;
+  background: rgba(91, 192, 235, 0.08); color: #A6D9F0;
+  text-decoration: none; font-size: 0.78rem; font-weight: 600;
+}
+.cad-link:hover { background: rgba(91, 192, 235, 0.16); border-color: #7DD3FC; }
+.cad-link-hint { font-size: 0.62rem; font-weight: 400; color: #5E8FA8; line-height: 1.35; }
+.cad-status { font-size: 0.7rem; color: #5E8FA8; line-height: 1.4; }
+.cad-status code {
+  background: #132A38; padding: 0.05rem 0.25rem; border-radius: 3px;
+  font-size: 0.65rem; color: #A6D9F0;
+}
+.cad-offline { display: flex; flex-direction: column; gap: 0.5rem; }
+.flow-approx {
+  font-size: 0.6rem; line-height: 1.45; color: #5E8FA8;
+  padding: 0.4rem 0.55rem; margin-top: 0.4rem;
+  background: rgba(94, 143, 168, 0.08);
+  border-left: 2px solid #5E8FA8; border-radius: 0 4px 4px 0;
+}

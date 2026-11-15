@@ -12,19 +12,14 @@ interface Props {
 }
 
 /**
- * Potential flow around a sphere (doublet solution).
+ * Potential flow around a sphere (classic doublet solution):
  *
  *   u(r) = U − (R³ / 2r³) · ( U − 3 (n̂·U) n̂ )
  *
- * where n̂ = (r − center)/|r − center| and U is the free-stream vector.
- * The perturbation is tangential at r = R (|u| = 3U/2 sin θ on the surface)
- * and vanishes at the upstream stagnation point (u = 0). Divergence-free,
- * classical textbook solution.
- *
- * NOTE: exact for spheres. For an arbitrary uploaded mesh, we evaluate the
- * sphere field around the mesh's bounding sphere — a decorative approximation,
- * not a solution of the Navier-Stokes equations. For real analysis use the
- * CAD editor link in the sidebar.
+ * Divergence-free; |u| = 0 at the upstream stagnation point and 3U/2 on
+ * the equator. Exact for spheres. For non-spherical meshes we evaluate the
+ * field around the bounding sphere — a decorative approximation, not a
+ * real CFD solve. Honest label lives in the sidebar.
  */
 function potentialFlow(
   px: number, py: number, pz: number,
@@ -45,7 +40,6 @@ function potentialFlow(
   const ratio = R / r;
   const strength = (ratio * ratio * ratio) / 2;
 
-  // Correct sign: perturbation is (U − 3(n̂·U) n̂), not the negation.
   const pxv = ux - 3 * nx * uDotN;
   const pyv = uy - 3 * ny * uDotN;
   const pzv = uz - 3 * nz * uDotN;
@@ -120,8 +114,6 @@ export function FlowParticles({
           ux, uy, uz
         );
       } else {
-        // Airfoil: chord-aligned heuristic. No Navier-Stokes; just displaces
-        // particles away from the section a bit so the geometry reads clearly.
         vx = ux;
         vy = uy;
         vz = uz;

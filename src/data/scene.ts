@@ -5,6 +5,8 @@ export interface FlowSphere {
   radius: number;
 }
 
+export type FlowDirection = 'free' | '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
+
 export type SceneContent =
   | { kind: 'default'; token: number }
   | { kind: 'naca'; code: string; token: number }

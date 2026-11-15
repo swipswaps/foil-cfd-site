@@ -32,22 +32,13 @@ const BASE_DIRS: { id: FlowDirection; label: string; modelOnly?: boolean }[] = [
 ];
 
 export function Sidebar({
-  open,
-  onClose,
-  devicePick,
-  detectedDevice,
-  onDeviceChange,
-  sceneContent,
-  onSceneChange,
-  flow,
-  onFlowChange,
-  direction,
-  onDirectionChange,
-  speed,
-  onSpeedChange,
-  cadStatus,
-  cadUrl,
-  onCadRetry,
+  open, onClose,
+  devicePick, detectedDevice, onDeviceChange,
+  sceneContent, onSceneChange,
+  flow, onFlowChange,
+  direction, onDirectionChange,
+  speed, onSpeedChange,
+  cadStatus, cadUrl, onCadRetry,
 }: Props) {
   const isModel = sceneContent.kind === 'model';
   const dirs = BASE_DIRS.filter((d) => !d.modelOnly || isModel);
@@ -112,9 +103,9 @@ export function Sidebar({
         <div className="flow-approx">
           Approximate visualization.
           {isModel
-            ? ' Potential flow around the model\u2019s bounding sphere.'
+            ? ' Potential flow around bounding sphere.'
             : ' Chord-aligned heuristic.'}
-          {' '}For real CFD, use the CAD editor below.
+          {' '}For real CFD, use the CAD editor.
         </div>
       </div>
 

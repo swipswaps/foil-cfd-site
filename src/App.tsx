@@ -7,7 +7,8 @@ import { Hero } from './sections/Hero';
 import { ReadmeSection } from './sections/ReadmeSection';
 import { ProjectShowcase } from './sections/ProjectShowcase';
 import { useBackendProbe } from './hooks/useBackendProbe';
-import type { SceneContent } from './data/scene';
+import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
+import type { SceneContent, FlowDirection } from './data/scene';
 
 function detectDevice(): DetectedDevice {
   if (typeof window === 'undefined') return 'desktop';
@@ -19,6 +20,8 @@ function detectDevice(): DetectedDevice {
 
 export default function App() {
   const backend = useBackendProbe();
+  const cad = useSketchForgeProbe();
+
   const [devicePick, setDevicePick] = useState<DevicePick>('auto');
   const [detectedDevice, setDetectedDevice] = useState<DetectedDevice>(detectDevice);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,6 +30,8 @@ export default function App() {
     token: 0,
   });
   const [flow, setFlow] = useState(true);
+  const [direction, setDirection] = useState<FlowDirection>('+x');
+  const [speed, setSpeed] = useState(2.0);
 
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
@@ -82,6 +87,13 @@ export default function App() {
           onSceneChange={setSceneContent}
           flow={flow}
           onFlowChange={setFlow}
+          direction={direction}
+          onDirectionChange={setDirection}
+          speed={speed}
+          onSpeedChange={setSpeed}
+          cadStatus={cad.status}
+          cadUrl={cad.url}
+          onCadRetry={cad.probe}
         />
         {sidebarOpen && (
           <div
@@ -98,7 +110,12 @@ export default function App() {
               onRetry={backend.probe}
             />
           </div>
-          <Hero content={sceneContent} flow={flow} />
+          <Hero
+            content={sceneContent}
+            flow={flow}
+            direction={direction}
+            speed={speed}
+          />
           <ReadmeSection />
           <ProjectShowcase />
           <footer className="footer">
