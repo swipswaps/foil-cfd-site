@@ -7,30 +7,19 @@ interface Props {
 }
 
 export function BackendBadge({ status, reason, onRetry }: Props) {
-  const dot =
-    status === 'online'
-      ? 'bg-emerald-400'
-      : status === 'probing'
-      ? 'bg-sky-400 animate-pulse'
-      : 'bg-amber-400';
-
   const label =
     status === 'online'
-      ? 'Backend online — full tools'
+      ? 'Backend online'
       : status === 'probing'
       ? 'Detecting backend…'
-      : `Static mode — limited tools (${reason})`;
+      : `Static mode — ${reason}`;
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200">
-      <span className={`h-2 w-2 rounded-full ${dot}`} />
-      <span>{label}</span>
+    <div className="backend-badge" role="status" aria-live="polite">
+      <span className={`backend-dot backend-dot-${status}`} aria-hidden="true" />
+      <span className="backend-label">{label}</span>
       {status !== 'online' && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="underline hover:text-white"
-        >
+        <button type="button" onClick={onRetry} className="backend-retry">
           Retry
         </button>
       )}
