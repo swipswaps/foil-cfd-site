@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700"
+     role="img" aria-labelledby="t d">
+  <title id="t">FOIL.CFD</title>
+  <desc id="d">NACA 16-series airfoil with computational mesh and streamlines outside the wing.</desc>
+  <defs>
+    <path id="f"
+      d="M250,350
+         C295,318 410,307 520,306
+         C630,305 715,320 750,350
+         C715,360 630,369 520,369
+         C410,370 295,362 250,350 Z"/>
+    <clipPath id="c">
+      <rect x="80" y="80" width="840" height="540" rx="20"/>
+    </clipPath>
+    <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="700">
+      <rect width="1000" height="700" fill="white"/>
+      <use href="#f" fill="black"/>
+    </mask>
+  </defs>
+  <rect x="80" y="80" width="840" height="540" rx="20"
+        fill="none" stroke="#1E3A4A" stroke-width="2"/>
+  <g clip-path="url(#c)" mask="url(#m)">
+    <g stroke="#164E63" stroke-width="1" opacity="0.85">
+      <path d="M112 80V620 M144 80V620 M176 80V620 M208 80V620
+               M240 80V620 M272 80V620 M304 80V620 M336 80V620
+               M368 80V620 M400 80V620 M432 80V620 M464 80V620
+               M496 80V620 M528 80V620 M560 80V620 M592 80V620
+               M624 80V620 M656 80V620 M688 80V620 M720 80V620
+               M752 80V620 M784 80V620 M816 80V620 M848 80V620
+               M880 80V620"/>
+      <path d="M80 112H920 M80 140H920 M80 168H920 M80 196H920
+               M80 224H920 M80 252H920 M80 280H920 M80 308H920
+               M80 336H920 M80 364H920 M80 392H920 M80 420H920
+               M80 448H920 M80 476H920 M80 504H920 M80 532H920
+               M80 560H920 M80 588H920 M80 616H920"/>
+    </g>
+    <g stroke="#1E5A78" stroke-width="1.4" opacity="0.9">
+      <path d="M112 80V620 M240 80V620 M368 80V620 M496 80V620
+               M624 80V620 M752 80V620 M880 80V620"/>
+      <path d="M80 112H920 M80 224H920 M80 336H920 M80 448H920 M80 560H920"/>
+    </g>
+    <g fill="none" stroke="#5BC0EB" stroke-linecap="round">
+      <path d="M140 235 C300 195 520 190 860 260" stroke-width="3.2" opacity="0.95"/>
+      <path d="M130 275 C310 230 540 225 870 290" stroke-width="2.4" opacity="0.9"/>
+      <path d="M140 410 C320 450 540 455 870 385" stroke-width="2.8" opacity="0.9"/>
+    </g>
+  </g>
+  <use href="#f" fill="#7DD3FC" stroke="#5BC0EB" stroke-width="4" stroke-linejoin="round"/>
+  <text x="500" y="560" text-anchor="middle"
+        font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif"
+        font-size="76" font-weight="400" letter-spacing="0"
+        fill="#E2F4FF" paint-order="stroke" stroke="#06121A"
+        stroke-width="8" stroke-linejoin="round">
+    FOIL<tspan fill="#5BC0EB">.CFD</tspan>
+  </text>
+</svg>

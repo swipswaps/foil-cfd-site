@@ -1,45 +1,54 @@
-import { FoilScene } from './components/FoilScene';
+import { NavBar } from './components/NavBar';
 import { BackendBadge } from './components/BackendBadge';
-import { ToolsPanel } from './components/ToolsPanel';
+import { Hero } from './sections/Hero';
+import { ReadmeSection } from './sections/ReadmeSection';
+import { ProjectShowcase } from './sections/ProjectShowcase';
+import { TemplateToggle } from './sections/TemplateToggle';
 import { useBackendProbe } from './hooks/useBackendProbe';
 
 export default function App() {
   const backend = useBackendProbe();
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        width: '100vw',
-        height: '100vh',
-        margin: 0,
-        padding: 0,
-      }}
-    >
-      <FoilScene />
-      <div
-        style={{
-          position: 'absolute',
-          top: 24,
-          left: 24,
-          zIndex: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}
-      >
-        <img
-          src={`${import.meta.env.BASE_URL}foil-logo.svg`}
-          alt="FOIL.CFD"
-          style={{ width: 260, height: 'auto' }}
-        />
+    <div style={{ background: '#06121A', minHeight: '100vh' }}>
+      <NavBar />
+
+      <div style={{ position: 'fixed', top: 68, right: 20, zIndex: 40 }}>
         <BackendBadge
           status={backend.status}
           reason={backend.reason}
           onRetry={backend.probe}
         />
-        <ToolsPanel online={backend.status === 'online'} />
       </div>
+
+      <Hero />
+      <ReadmeSection />
+      <ProjectShowcase />
+
+      <footer
+        style={{
+          borderTop: '1px solid #1E3A4A',
+          padding: '2rem 1.5rem',
+          textAlign: 'center',
+          fontSize: '0.75rem',
+          color: '#5E8FA8',
+        }}
+      >
+        <span style={{ marginRight: '0.5rem' }}>
+          FOIL<span style={{ color: '#5BC0EB' }}>.CFD</span>
+        </span>
+        ·{' '}
+        <a
+          href="https://github.com/swipswaps/foil-cfd-site"
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: 'inherit', textDecoration: 'underline' }}
+        >
+          GitHub
+        </a>
+      </footer>
+
+      <TemplateToggle />
     </div>
   );
 }
