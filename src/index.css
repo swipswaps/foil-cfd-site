@@ -486,52 +486,6 @@ a { color: inherit; }
 .app-frame.device-phone .footer { padding: 1.5rem 1rem; font-size: 0.72rem; }
 
 /* =========================================================================
-   DEVICE CONTROLS (bottom pill)
-   ========================================================================= */
-.device-controls {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(11, 26, 36, 0.95);
-  border: 1px solid #1E3A4A;
-  border-radius: 999px;
-  padding: 6px 6px 6px 14px;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
-  max-width: calc(100vw - 20px);
-}
-.device-controls-label {
-  font-size: 0.6rem;
-  color: #5E8FA8;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-weight: 700;
-  margin-right: 6px;
-  white-space: nowrap;
-}
-.device-controls button {
-  border: none;
-  background: transparent;
-  color: #94AEBF;
-  font-size: 0.72rem;
-  padding: 6px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-family: inherit;
-  font-weight: 600;
-  transition: background 0.2s ease, color 0.2s ease;
-  white-space: nowrap;
-}
-.device-controls button:hover { color: #E2F4FF; background: rgba(30, 58, 74, 0.5); }
-.device-controls button.active { background: #5BC0EB; color: #06121A; }
-
-/* =========================================================================
    REAL VIEWPORT MEDIA QUERIES (fallback below 600px)
    ========================================================================= */
 @media (max-width: 600px) {
@@ -544,10 +498,6 @@ a { color: inherit; }
   .backend-badge-wrapper { right: 12px; top: 56px; }
   .backend-badge { font-size: 0.66rem; padding: 0.35rem 0.6rem; }
   .backend-retry { font-size: 0.66rem; }
-
-  .device-controls { bottom: 12px; padding: 5px 5px 5px 10px; }
-  .device-controls-label { font-size: 0.55rem; margin-right: 2px; }
-  .device-controls button { font-size: 0.66rem; padding: 5px 9px; }
   .app-shell { padding-bottom: 80px; }
 
   .readme-section { padding: 3rem 1rem 1.5rem; }
@@ -569,4 +519,150 @@ a { color: inherit; }
   .app-frame.device-phone .app-sidebar { left: 0; }
   .app-frame.device-phone .sidebar-backdrop { left: 0; right: 0; }
   .app-frame.device-phone .backend-badge-wrapper { right: 12px; }
+}
+
+/* =========================================================================
+   SIDEBAR SECTIONS (device + upload)
+   ========================================================================= */
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid #1E3A4A;
+}
+.sidebar-section:last-of-type { border-bottom: none; }
+.sidebar-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5E8FA8;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.sidebar-section-hint {
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #4A6E80;
+  font-style: italic;
+}
+
+/* --- Device picker --- */
+.device-pick {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem;
+}
+.device-pick button {
+  border: 1px solid #1E3A4A;
+  background: transparent;
+  color: #94AEBF;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.45rem 0.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.device-pick button:hover { background: #132A38; color: #E2F4FF; }
+.device-pick button.active {
+  background: #5BC0EB;
+  border-color: #5BC0EB;
+  color: #06121A;
+}
+
+/* --- Upload panel --- */
+.upload-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.upload-label {
+  font-size: 0.65rem;
+  color: #7FB6D4;
+  letter-spacing: 0.05em;
+}
+.upload-row {
+  display: flex;
+  gap: 0.35rem;
+}
+.upload-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  background: #06121A;
+  border: 1px solid #1E3A4A;
+  border-radius: 5px;
+  color: #E2F4FF;
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.upload-input:focus { border-color: #5BC0EB; }
+.upload-input::placeholder { color: #3A5C6E; }
+
+.upload-btn {
+  padding: 0.4rem 0.75rem;
+  background: #132A38;
+  border: 1px solid #1E3A4A;
+  border-radius: 5px;
+  color: #7FB6D4;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.upload-btn:hover:not(:disabled) {
+  background: #1A3A4E;
+  border-color: #5BC0EB;
+  color: #A6D9F0;
+}
+.upload-btn:disabled { opacity: 0.5; cursor: wait; }
+.upload-btn-full { width: 100%; }
+
+.upload-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  color: #5E8FA8;
+  padding-top: 0.2rem;
+}
+.upload-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.upload-reset {
+  background: transparent;
+  border: none;
+  color: #5BC0EB;
+  font-size: 0.68rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+.upload-reset:hover { color: #A6D9F0; }
+
+.upload-error {
+  font-size: 0.68rem;
+  color: #F87171;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 5px;
+  padding: 0.4rem 0.55rem;
+  line-height: 1.4;
 }

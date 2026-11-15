@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { NavBar } from './components/NavBar';
 import { Sidebar } from './components/Sidebar';
 import { BackendBadge } from './components/BackendBadge';
-import { DeviceControls, type Device } from './components/DeviceControls';
+import { type DevicePick, type DetectedDevice } from './components/DevicePanel';
 import { Hero } from './sections/Hero';
 import { ReadmeSection } from './sections/ReadmeSection';
 import { ProjectShowcase } from './sections/ProjectShowcase';
 import { useBackendProbe } from './hooks/useBackendProbe';
+import type { SceneContent } from './data/scene';
 
-function detectDevice(): Device {
+function detectDevice(): DetectedDevice {
   if (typeof window === 'undefined') return 'desktop';
   const w = window.innerWidth;
   if (w < 600) return 'phone';
@@ -18,14 +19,36 @@ function detectDevice(): Device {
 
 export default function App() {
   const backend = useBackendProbe();
-  const [device, setDevice] = useState<Device>(detectDevice);
+  const [devicePick, setDevicePick] = useState<DevicePick>('auto');
+  const [detectedDevice, setDetectedDevice] = useState<DetectedDevice>(detectDevice);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sceneContent, setSceneContent] = useState<SceneContent>({ kind: 'default' });
 
+  const effectiveDevice: DetectedDevice =
+    devicePick === 'auto' ? detectedDevice : devicePick;
+
+  // Continuous auto-detect: updates on resize and orientationchange.
   useEffect(() => {
-    document.documentElement.setAttribute('data-device', device);
-    document.documentElement.setAttribute('data-sidebar', sidebarOpen ? 'open' : 'closed');
-  }, [device, sidebarOpen]);
+    const update = () => setDetectedDevice(detectDevice());
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
 
+  // Reflect effective device on <html> so CSS media queries can rely on it.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-device', effectiveDevice);
+    document.documentElement.setAttribute(
+      'data-sidebar',
+      sidebarOpen ? 'open' : 'closed'
+    );
+  }, [effectiveDevice, sidebarOpen]);
+
+  // Escape closes sidebar
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSidebarOpen(false);
@@ -34,14 +57,31 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Dispose previous STL geometry when content is replaced or app unmounts.
+  useEffect(() => {
+    return () => {
+      if (sceneContent.kind === 'stl') {
+        sceneContent.geometry.dispose();
+      }
+    };
+  }, [sceneContent]);
+
   return (
     <div className="app-shell">
-      <div className={`app-frame device-${device}`}>
+      <div className={`app-frame device-${effectiveDevice}`}>
         <NavBar
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
           sidebarOpen={sidebarOpen}
         />
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          devicePick={devicePick}
+          detectedDevice={detectedDevice}
+          onDeviceChange={setDevicePick}
+          sceneContent={sceneContent}
+          onSceneChange={setSceneContent}
+        />
         {sidebarOpen && (
           <div
             className="sidebar-backdrop"
@@ -57,7 +97,7 @@ export default function App() {
               onRetry={backend.probe}
             />
           </div>
-          <Hero />
+          <Hero content={sceneContent} />
           <ReadmeSection />
           <ProjectShowcase />
           <footer className="footer">
@@ -76,7 +116,6 @@ export default function App() {
           </footer>
         </main>
       </div>
-      <DeviceControls device={device} onDeviceChange={setDevice} />
     </div>
   );
 }
