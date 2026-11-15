@@ -1,77 +1,62 @@
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
 import { Airfoil } from './Airfoil';
 import { FlowParticles } from './FlowParticles';
 import { ModelViewer } from './ModelViewer';
-import type { SceneContent, FlowDirection } from '../data/scene';
+import type { SceneContent } from '../data/scene';
 
 interface Props {
   content: SceneContent;
   flow: boolean;
-  direction: FlowDirection;
   speed: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
 }
 
-export function FoilScene({ content, flow, direction, speed }: Props) {
+export function FoilScene({
+  content, flow, speed,
+  rotationX, rotationY, rotationZ,
+}: Props) {
+  const quat = useMemo(() => {
+    const e = new THREE.Euler(
+      (rotationX * Math.PI) / 180,
+      (rotationY * Math.PI) / 180,
+      (rotationZ * Math.PI) / 180,
+      'XYZ'
+    );
+    return new THREE.Quaternion().setFromEuler(e);
+  }, [rotationX, rotationY, rotationZ]);
+
   return (
     <Canvas
       camera={{ position: [0, 1.5, 5], fov: 45 }}
       gl={{ antialias: true, alpha: false }}
-      onCreated={({ gl }) => {
-        gl.setClearColor('#0B2545', 1);
-      }}
+      onCreated={({ gl }) => { gl.setClearColor('#0B2545', 1); }}
     >
       <color attach="background" args={['#0B2545']} />
-
-      {/* Two-point lighting — no external HDRI dependency. */}
       <ambientLight intensity={0.65} />
       <directionalLight position={[5, 5, 5]} intensity={1.4} />
       <directionalLight position={[-5, 2, -3]} intensity={0.5} color="#5BC0EB" />
 
       <Suspense fallback={null}>
-        {content.kind === 'default' && (
-          <>
-            <Airfoil />
-            {flow && (
-              <FlowParticles
-                key={`flow-d-${content.token}-${direction}`}
-                mode="planar"
-                direction={direction}
-                speed={speed}
-              />
-            )}
-          </>
-        )}
+        <group quaternion={quat}>
+          {content.kind === 'default' && <Airfoil />}
+          {content.kind === 'naca' && <Airfoil code={content.code} />}
+          {content.kind === 'model' && <ModelViewer object={content.object} />}
+        </group>
 
-        {content.kind === 'naca' && (
-          <>
-            <Airfoil code={content.code} />
-            {flow && (
-              <FlowParticles
-                key={`flow-n-${content.token}-${direction}`}
-                mode="planar"
-                direction={direction}
-                speed={speed}
-              />
-            )}
-          </>
-        )}
-
-        {content.kind === 'model' && (
-          <>
-            <ModelViewer object={content.object} />
-            {flow && (
-              <FlowParticles
-                key={`flow-m-${content.token}-${direction}`}
-                mode="volume"
-                count={3500}
-                flowSphere={content.sphere}
-                direction={direction}
-                speed={speed}
-              />
-            )}
-          </>
+        {flow && (
+          <FlowParticles
+            key={`flow-${content.token}-${rotationX}-${rotationY}-${rotationZ}`}
+            mode={content.kind === 'model' ? 'volume' : 'planar'}
+            count={content.kind === 'model' ? 3500 : 2500}
+            flowSphere={content.kind === 'model' ? content.sphere : undefined}
+            bodyQuaternion={quat}
+            speed={speed}
+          />
         )}
       </Suspense>
 

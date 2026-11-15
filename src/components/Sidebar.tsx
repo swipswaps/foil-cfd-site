@@ -1,6 +1,6 @@
 import { DevicePanel, type DevicePick, type DetectedDevice } from './DevicePanel';
 import { ModelUploader } from './ModelUploader';
-import type { SceneContent, FlowDirection } from '../data/scene';
+import type { SceneContent } from '../data/scene';
 
 interface Props {
   open: boolean;
@@ -12,37 +12,27 @@ interface Props {
   onSceneChange: (c: SceneContent) => void;
   flow: boolean;
   onFlowChange: (v: boolean) => void;
-  direction: FlowDirection;
-  onDirectionChange: (d: FlowDirection) => void;
   speed: number;
   onSpeedChange: (s: number) => void;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
+  onRotationChange: (axis: 'x' | 'y' | 'z', v: number) => void;
+  onRotationReset: () => void;
   cadStatus: 'probing' | 'online' | 'offline';
   cadUrl: string;
   onCadRetry: () => void;
 }
-
-const BASE_DIRS: { id: FlowDirection; label: string; modelOnly?: boolean }[] = [
-  { id: 'free', label: 'Free' },
-  { id: '+x', label: '+X' },
-  { id: '-x', label: '−X' },
-  { id: '+y', label: '+Y' },
-  { id: '-y', label: '−Y' },
-  { id: '+z', label: '+Z', modelOnly: true },
-  { id: '-z', label: '−Z', modelOnly: true },
-];
 
 export function Sidebar({
   open, onClose,
   devicePick, detectedDevice, onDeviceChange,
   sceneContent, onSceneChange,
   flow, onFlowChange,
-  direction, onDirectionChange,
   speed, onSpeedChange,
+  rotationX, rotationY, rotationZ, onRotationChange, onRotationReset,
   cadStatus, cadUrl, onCadRetry,
 }: Props) {
-  const isModel = sceneContent.kind === 'model';
-  const dirs = BASE_DIRS.filter((d) => !d.modelOnly || isModel);
-
   return (
     <aside className={`app-sidebar ${open ? 'open' : ''}`} aria-hidden={!open}>
       <div className="sidebar-head">
@@ -59,11 +49,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <DevicePanel
-        pick={devicePick}
-        detected={detectedDevice}
-        onChange={onDeviceChange}
-      />
+      <DevicePanel pick={devicePick} detected={detectedDevice} onChange={onDeviceChange} />
 
       <ModelUploader
         content={sceneContent}
@@ -73,39 +59,39 @@ export function Sidebar({
       />
 
       <div className="sidebar-section">
-        <div className="sidebar-section-label">Flow direction</div>
-        <div className="direction-grid">
-          {dirs.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => onDirectionChange(d.id)}
-              className={direction === d.id ? 'active' : ''}
-              aria-pressed={direction === d.id}
-            >
-              {d.label}
-            </button>
-          ))}
+        <div className="sidebar-section-label">
+          Object rotation
+          <button type="button" className="sidebar-reset" onClick={onRotationReset}>
+            Reset
+          </button>
+        </div>
+        <div className="rot-slider">
+          <label>Pitch (Z)</label>
+          <input type="range" min={-180} max={180} step={1} value={rotationZ}
+            onChange={(e) => onRotationChange('z', Number(e.target.value))} />
+          <span>{rotationZ.toFixed(0)}°</span>
+        </div>
+        <div className="rot-slider">
+          <label>Yaw (Y)</label>
+          <input type="range" min={-180} max={180} step={1} value={rotationY}
+            onChange={(e) => onRotationChange('y', Number(e.target.value))} />
+          <span>{rotationY.toFixed(0)}°</span>
+        </div>
+        <div className="rot-slider">
+          <label>Roll (X)</label>
+          <input type="range" min={-180} max={180} step={1} value={rotationX}
+            onChange={(e) => onRotationChange('x', Number(e.target.value))} />
+          <span>{rotationX.toFixed(0)}°</span>
         </div>
         <div className="speed-row">
           <label htmlFor="flow-speed">Speed</label>
-          <input
-            id="flow-speed"
-            type="range"
-            min={0.5}
-            max={5}
-            step={0.1}
-            value={speed}
-            onChange={(e) => onSpeedChange(Number(e.target.value))}
-          />
+          <input id="flow-speed" type="range" min={0.5} max={5} step={0.1}
+            value={speed} onChange={(e) => onSpeedChange(Number(e.target.value))} />
           <span className="speed-value">{speed.toFixed(1)}×</span>
         </div>
         <div className="flow-approx">
-          Approximate visualization.
-          {isModel
-            ? ' Potential flow around bounding sphere.'
-            : ' Chord-aligned heuristic.'}
-          {' '}For real CFD, use the CAD editor.
+          Potential-flow visualization. Rotate the object to change
+          its angle to the wind. For real CFD, use the CAD editor.
         </div>
       </div>
 
@@ -114,9 +100,7 @@ export function Sidebar({
         {cadStatus === 'online' ? (
           <a href={cadUrl} target="_blank" rel="noreferrer" className="cad-link">
             Open SketchForge-3D ↗
-            <span className="cad-link-hint">
-              import STL · booleans · export STL/OBJ/STEP
-            </span>
+            <span className="cad-link-hint">import STL · booleans · export STL/OBJ/STEP</span>
           </a>
         ) : cadStatus === 'probing' ? (
           <span className="cad-status">Checking local editor…</span>
@@ -125,9 +109,7 @@ export function Sidebar({
             <span className="cad-status">
               Not running. Start with <code>docker compose up -d</code>.
             </span>
-            <button type="button" className="upload-btn" onClick={onCadRetry}>
-              Retry
-            </button>
+            <button type="button" className="upload-btn" onClick={onCadRetry}>Retry</button>
           </div>
         )}
       </div>
@@ -139,11 +121,7 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar-foot">
-        <a
-          href="https://github.com/swipswaps/foil-cfd-site"
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a href="https://github.com/swipswaps/foil-cfd-site" target="_blank" rel="noreferrer">
           GitHub ↗
         </a>
       </div>

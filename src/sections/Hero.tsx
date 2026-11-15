@@ -1,15 +1,17 @@
 import { FoilScene } from '../components/FoilScene';
 import { CanvasBoundary } from '../components/CanvasBoundary';
-import type { SceneContent, FlowDirection } from '../data/scene';
+import type { SceneContent } from '../data/scene';
 
 interface Props {
   content: SceneContent;
   flow: boolean;
-  direction: FlowDirection;
   speed: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
 }
 
-export function Hero({ content, flow, direction, speed }: Props) {
+export function Hero({ content, flow, speed, rotationX, rotationY, rotationZ }: Props) {
   return (
     <section id="top" className="hero-section">
       <h1 className="sr-only">
@@ -19,8 +21,10 @@ export function Hero({ content, flow, direction, speed }: Props) {
         <FoilScene
           content={content}
           flow={flow}
-          direction={direction}
           speed={speed}
+          rotationX={rotationX}
+          rotationY={rotationY}
+          rotationZ={rotationZ}
         />
       </CanvasBoundary>
       <div className="hero-caption">

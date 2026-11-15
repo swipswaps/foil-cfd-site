@@ -126,12 +126,16 @@ async function loadModelFile(file: File): Promise<{
   const finalBox = new THREE.Box3().setFromObject(group);
   const sphere = new THREE.Sphere();
   finalBox.getBoundingSphere(sphere);
+  const halfExtents = new THREE.Vector3();
+  finalBox.getSize(halfExtents);
+  halfExtents.multiplyScalar(0.5);
 
   return {
     object: group,
     sphere: {
       center: sphere.center.clone(),
       radius: Math.max(sphere.radius, 0.4),
+      halfExtents: halfExtents.clone(),
     },
   };
 }

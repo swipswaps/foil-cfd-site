@@ -8,7 +8,7 @@ import { ReadmeSection } from './sections/ReadmeSection';
 import { ProjectShowcase } from './sections/ProjectShowcase';
 import { useBackendProbe } from './hooks/useBackendProbe';
 import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
-import type { SceneContent, FlowDirection } from './data/scene';
+import type { SceneContent } from './data/scene';
 
 function detectDevice(): DetectedDevice {
   if (typeof window === 'undefined') return 'desktop';
@@ -22,7 +22,7 @@ export default function App() {
   const backend = useBackendProbe();
   const cad = useSketchForgeProbe();
 
-  const [devicePick, setDevicePick] = useState<DevicePick>('auto');
+  const [devicePick, setDevicePick] = useState<DevicePick>(() => detectDevice());
   const [detectedDevice, setDetectedDevice] = useState<DetectedDevice>(detectDevice);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sceneContent, setSceneContent] = useState<SceneContent>({
@@ -30,8 +30,10 @@ export default function App() {
     token: 0,
   });
   const [flow, setFlow] = useState(true);
-  const [direction, setDirection] = useState<FlowDirection>('+x');
   const [speed, setSpeed] = useState(2.0);
+  const [rotationX, setRotationX] = useState(0);
+  const [rotationY, setRotationY] = useState(0);
+  const [rotationZ, setRotationZ] = useState(0);
 
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
@@ -56,19 +58,24 @@ export default function App() {
   }, [effectiveDevice, sidebarOpen]);
 
   useEffect(() => {
-    // +Z / -Z flow only makes sense for 3D models.
-    if (sceneContent.kind !== 'model' && (direction === '+z' || direction === '-z')) {
-      setDirection('+x');
-    }
-  }, [sceneContent.kind, direction]);
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSidebarOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  const handleRotation = (axis: 'x' | 'y' | 'z', v: number) => {
+    if (axis === 'x') setRotationX(v);
+    else if (axis === 'y') setRotationY(v);
+    else setRotationZ(v);
+  };
+
+  const resetRotation = () => {
+    setRotationX(0);
+    setRotationY(0);
+    setRotationZ(0);
+  };
 
   return (
     <div className="app-shell">
@@ -87,10 +94,13 @@ export default function App() {
           onSceneChange={setSceneContent}
           flow={flow}
           onFlowChange={setFlow}
-          direction={direction}
-          onDirectionChange={setDirection}
           speed={speed}
           onSpeedChange={setSpeed}
+          rotationX={rotationX}
+          rotationY={rotationY}
+          rotationZ={rotationZ}
+          onRotationChange={handleRotation}
+          onRotationReset={resetRotation}
           cadStatus={cad.status}
           cadUrl={cad.url}
           onCadRetry={cad.probe}
@@ -113,8 +123,10 @@ export default function App() {
           <Hero
             content={sceneContent}
             flow={flow}
-            direction={direction}
             speed={speed}
+            rotationX={rotationX}
+            rotationY={rotationY}
+            rotationZ={rotationZ}
           />
           <ReadmeSection />
           <ProjectShowcase />

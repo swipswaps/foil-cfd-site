@@ -3,9 +3,8 @@ import type * as THREE from 'three';
 export interface FlowSphere {
   center: THREE.Vector3;
   radius: number;
+  halfExtents?: THREE.Vector3;
 }
-
-export type FlowDirection = 'free' | '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
 
 export type SceneContent =
   | { kind: 'default'; token: number }
