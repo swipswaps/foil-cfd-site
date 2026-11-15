@@ -53,37 +53,6 @@ Manual equivalent:
     gh run watch
 
 
-PROJECTS SHOWCASED
-------------------
-
-This site links to eight swipswaps repositories:
-
-    foil-cfd-site
-    solar-nostoc-cad-bridge
-    solar-panel-cad-bridge
-    LECDS-Configurator
-    Solar-Farm-Feasibility-Engine
-    video_flow_cfd_tool
-    parachute-cfd-game
-    lost-pla-explainer
-
-See the Projects section below, or the GitHub org page:
-https://github.com/swipswaps
-
-
-TEMPLATES
----------
-
-The bottom-of-page toggle switches between three visual treatments:
-
-    minimal    clean, content-first typography
-    cinematic  dramatic type scale, darker spacing
-    grid       compact, engineering-dashboard feel
-
-The choice persists in localStorage. The initial render defaults to
-minimal on first visit.
-
-
 LICENSE
 -------
 

@@ -25,24 +25,16 @@ export default function App() {
       <ReadmeSection />
       <ProjectShowcase />
 
-      <footer
-        style={{
-          borderTop: '1px solid #1E3A4A',
-          padding: '2rem 1.5rem',
-          textAlign: 'center',
-          fontSize: '0.75rem',
-          color: '#5E8FA8',
-        }}
-      >
-        <span style={{ marginRight: '0.5rem' }}>
-          FOIL<span style={{ color: '#5BC0EB' }}>.CFD</span>
+      <footer className="footer">
+        <span className="footer-brand">
+          FOIL<span className="footer-brand-dot">.CFD</span>
         </span>
         ·{' '}
         <a
           href="https://github.com/swipswaps/foil-cfd-site"
           target="_blank"
           rel="noreferrer"
-          style={{ color: 'inherit', textDecoration: 'underline' }}
+          className="footer-link"
         >
           GitHub
         </a>
