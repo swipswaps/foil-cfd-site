@@ -58,7 +58,6 @@ export function FlowParticles({
     if (!geom) return;
     const pos = geom.attributes.position.array as Float32Array;
     
-    // Sub-stepping configuration to prevent numerical overshooting / particle separation
     const subSteps = 3;
     const frameDt = Math.min(delta, 0.05) * speed;
     const dt = frameDt / subSteps;
@@ -72,7 +71,6 @@ export function FlowParticles({
     const windLocal = windWorld.clone().applyQuaternion(qInv);
     const alphaLocal = Math.atan2(windLocal.y, windLocal.x);
     const gamma = Math.PI * U * chord * Math.sin(alphaLocal);
-    const lambda = U * 0.15;
     const vMax = U * 2.5;
 
     const span = mode === 'volume' ? 4 : 0.2;
@@ -154,19 +152,17 @@ export function FlowParticles({
 
           let ux = windLocal.x, uy = windLocal.y, uz = windLocal.z;
 
-          if (Math.abs(lx) < 1 && Math.abs(ly) < 0.15) {
-            const pushY = 0.15 - Math.abs(ly);
-            const pushX = 1 - Math.abs(lx);
-            if (pushY < pushX) {
-              uy += Math.sign(ly || 1) * U * 1.5;
-            } else {
-              ux += Math.sign(lx || 1) * U * 1.5;
-            }
+          // Non-blocking transverse thickness deflection over airfoil body (-1 < lx < 1)
+          if (lx > -1.1 && lx < 1.1 && Math.abs(ly) < 0.3) {
+            const thicknessEnvelop = Math.max(0, 1 - (lx * lx) / 1.21);
+            const upwardBias = Math.sign(ly || 1) * U * 0.6 * thicknessEnvelop;
+            uy += upwardBias;
           }
 
+          // Vortex at quarter chord (-0.5, 0) for lift circulation
           const dxV = lx + 0.5;
           const dyV = ly;
-          const rV2 = dxV * dxV + dyV * dyV + 0.12;
+          const rV2 = dxV * dxV + dyV * dyV + 0.15;
           let uV = -gamma / (2 * Math.PI) * dyV / rV2;
           let vV = gamma / (2 * Math.PI) * dxV / rV2;
           const magV = uV * uV + vV * vV;
@@ -175,16 +171,6 @@ export function FlowParticles({
             uV *= s; vV *= s;
           }
           ux += uV; uy += vV;
-
-          const rS2 = lx * lx + ly * ly + 0.12;
-          let uS = lambda / (2 * Math.PI) * lx / rS2;
-          let vS = lambda / (2 * Math.PI) * ly / rS2;
-          const magS = uS * uS + vS * vS;
-          if (magS > vMax * vMax) {
-            const s = vMax / Math.sqrt(magS);
-            uS *= s; vS *= s;
-          }
-          ux += uS; uy += vS;
 
           v.set(ux, uy, uz).applyQuaternion(q);
           vx = v.x; vy = v.y; vz = v.z;
