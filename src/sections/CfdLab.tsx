@@ -1,12 +1,19 @@
-import { useEffect, useState } from 'react';
-import { CfdVtkViewer } from '../components/CfdVtkViewer';
-import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
-import { CpPolarChart } from '../components/CpPolarChart';
+import { useEffect, useState, lazy, Suspense } from 'react';
 
-interface Props {
-  backendUrl: string;
-  solverAvailable: boolean;
-}
+const CfdVtkViewer = lazy(() =>
+  import('../components/CfdVtkViewer').then((m) => ({ default: m.CfdVtkViewer }))
+);
+const CpPolarChart = lazy(() =>
+  import('../components/CpPolarChart').then((m) => ({ default: m.CpPolarChart }))
+);
+
+import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
+
+interface Props { backendUrl: string; solverAvailable: boolean }
+
+const FieldSkeleton = ({ label }: { label: string }) => (
+  <div className="cfd-vtk-skeleton" aria-label={`Loading ${label}`} />
+);
 
 export function CfdLab({ backendUrl, solverAvailable }: Props) {
   const [jobId, setJobId] = useState<string | null>(null);
@@ -63,11 +70,7 @@ export function CfdLab({ backendUrl, solverAvailable }: Props) {
       <header className="cfd-lab-head">
         <h2>CFD Laboratory</h2>
         <div className="cfd-lab-status">
-          <span>
-            {solverAvailable
-              ? 'OpenFOAM ready'
-              : 'Solver unavailable · showing default mesh'}
-          </span>
+          <span>{solverAvailable ? 'OpenFOAM ready' : 'Solver unavailable · showing default mesh'}</span>
           {solverAvailable && (
             <button
               type="button"
@@ -75,24 +78,22 @@ export function CfdLab({ backendUrl, solverAvailable }: Props) {
               disabled={jobStatus === 'running' || jobStatus === 'submitting'}
               className="cfd-solve-btn"
             >
-              {jobStatus === 'running'
-                ? 'Solving…'
-                : jobStatus === 'submitting'
-                ? 'Submitting…'
-                : 'Run simpleFoam'}
+              {jobStatus === 'running' ? 'Solving…' : jobStatus === 'submitting' ? 'Submitting…' : 'Run simpleFoam'}
             </button>
           )}
         </div>
       </header>
-      {jobId && (
-        <div className="cfd-job-status">Job {jobId.slice(0, 8)} · {jobStatus}</div>
-      )}
+      {jobId && <div className="cfd-job-status">Job {jobId.slice(0, 8)} · {jobStatus}</div>}
       {error && <div className="cfd-error">{error}</div>}
       <div className="cfd-lab-grid">
         <CfdVtkBoundary>
-          <CfdVtkViewer datasetUrl={datasetUrl} />
+          <Suspense fallback={<FieldSkeleton label="VTK viewer" />}>
+            <CfdVtkViewer datasetUrl={datasetUrl} />
+          </Suspense>
         </CfdVtkBoundary>
-        <CpPolarChart />
+        <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
+          <CpPolarChart />
+        </Suspense>
       </div>
     </section>
   );
