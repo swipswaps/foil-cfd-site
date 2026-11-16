@@ -43,12 +43,15 @@ export function Sidebar({
   speed, onSpeedChange,
   rotationX, rotationY, rotationZ, onRotationChange, onRotationReset,
   cadStatus, cadUrl, onCadRetry,
-  backendMode, backendUrl, solverAvailable, onBackendRetry,
+  backendUrl, solverAvailable, onBackendRetry,
   cfdField, onCfdFieldChange,
   cfdJobId, cfdJobStatus, cfdError, onCfdSolve,
 }: Props) {
   const solving = cfdJobStatus === 'running' || cfdJobStatus === 'submitting';
   const portLabel = backendUrl ? backendUrl.replace(/^https?:\/\//, '') : 'offline';
+  // backendUrl is only set when the probe actually got a 200 from /api/health.
+  // Use it as the single source of truth instead of backendMode, which can drift.
+  const backendOnline = !!backendUrl;
 
   return (
     <aside className={`app-sidebar ${open ? 'open' : ''}`} aria-hidden={!open}>
@@ -105,14 +108,13 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* -------- Scientific tools (CFD lab) -------- */}
       <div className="sidebar-section">
         <div className="sidebar-section-label">
           Scientific tools
           <span className="sidebar-section-hint">{portLabel}</span>
         </div>
 
-        {backendMode === 'cfd' ? (
+        {backendOnline ? (
           <>
             <div className="cfd-sidebar-row">
               <label className="cfd-sidebar-label">Field</label>
@@ -156,7 +158,7 @@ export function Sidebar({
           </>
         ) : (
           <div className="flow-approx">
-            Backend offline. Start with <code>docker compose up -d</code>.
+            Backend offline. Start with <code>docker compose up --build -d</code>.
             <button
               type="button"
               onClick={onBackendRetry}
