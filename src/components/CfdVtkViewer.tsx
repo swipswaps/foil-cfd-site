@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Force WebGL backend on VTK.js — Chrome's navigator.gpu returns null from
-// requestAdapter(), which VTK.js 16.14+ mis-handles as a null context.
 if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
   try {
     Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
   } catch {
-    /* read-only in some engines; pinning vtk.js still keeps WebGL default */
+    /* read-only in some engines */
   }
 }
 
@@ -17,7 +15,10 @@ import vtkXMLPolyDataReader from '@kitware/vtk.js/IO/XML/XMLPolyDataReader';
 import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
 
-interface Props { datasetUrl: string }
+interface Props {
+  datasetUrl: string;
+  field: 'p' | 'U' | 'T';
+}
 
 interface VtkRefs {
   view: ReturnType<typeof vtkGenericRenderWindow.newInstance>;
@@ -27,19 +28,17 @@ interface VtkRefs {
   ro?: ResizeObserver;
 }
 
-export function CfdVtkViewer({ datasetUrl }: Props) {
+export function CfdVtkViewer({ datasetUrl, field }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vtkRef = useRef<VtkRefs | null>(null);
   const initFailedRef = useRef(false);
   const [status, setStatus] = useState('Waiting for layout…');
-  const [field, setField] = useState('p');
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     let cancelled = false;
     let raf = 0;
-
     const tryInit = () => {
       if (cancelled || initFailedRef.current || vtkRef.current) return;
       if (container.clientWidth === 0 || container.clientHeight === 0) {
@@ -70,7 +69,6 @@ export function CfdVtkViewer({ datasetUrl }: Props) {
       }
     };
     raf = requestAnimationFrame(tryInit);
-
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
@@ -115,7 +113,7 @@ export function CfdVtkViewer({ datasetUrl }: Props) {
         }
         vtk.view.getRenderer().resetCamera();
         vtk.view.getRenderWindow().render();
-        setStatus(`${data.getNumberOfPoints()} pts · ${data.getNumberOfCells()} cells`);
+        setStatus(`${data.getNumberOfPoints()} pts · ${data.getNumberOfCells()} cells · field=${field}`);
       } catch (err) {
         if (!cancelled) setStatus(err instanceof Error ? err.message : 'Load failed');
       }
@@ -128,14 +126,7 @@ export function CfdVtkViewer({ datasetUrl }: Props) {
     <section className="cfd-vtk">
       <header className="cfd-vtk-head">
         <span>{status}</span>
-        <label>
-          Field
-          <select value={field} onChange={(e) => setField(e.target.value)}>
-            <option value="p">Pressure (p)</option>
-            <option value="U">Velocity (U)</option>
-            <option value="T">Temperature (T)</option>
-          </select>
-        </label>
+        <span className="cfd-vtk-field-badge">{field.toUpperCase()}</span>
       </header>
       <div ref={containerRef} className="cfd-vtk-canvas" />
     </section>

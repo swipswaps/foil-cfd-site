@@ -985,3 +985,67 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   0% { background-position: 100% 50%; }
   100% { background-position: -100% 50%; }
 }
+
+
+/* =========================================================================
+   SIDEBAR — SCIENTIFIC TOOLS
+   ========================================================================= */
+.cfd-sidebar-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  align-items: center;
+}
+.cfd-sidebar-label {
+  font-size: 0.7rem;
+  color: #7FB6D4;
+  font-weight: 600;
+}
+.cfd-sidebar-status {
+  font-size: 0.68rem;
+  color: #C9DDE8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+}
+.cfd-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cfd-status-queued { background: #F4A261; }
+.cfd-status-submitting { background: #5BC0EB; animation: pulse 1.4s infinite; }
+.cfd-status-running { background: #5BC0EB; animation: pulse 1.4s infinite; }
+.cfd-status-completed { background: #10B981; }
+.cfd-status-failed { background: #F87171; }
+.cfd-sidebar-jump {
+  display: inline-block;
+  font-size: 0.68rem;
+  color: #5BC0EB;
+  text-decoration: underline;
+  margin-top: 0.15rem;
+}
+.cfd-sidebar-jump:hover { color: #A6D9F0; }
+.cfd-vtk-field-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.65rem;
+  background: rgba(91, 192, 235, 0.15);
+  color: #5BC0EB;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.cfd-lab-hint {
+  font-size: 0.72rem;
+  color: #5E8FA8;
+  font-style: italic;
+}
+.cfd-lab-credit {
+  margin: 1rem 0 0;
+  font-size: 0.68rem;
+  color: #5E8FA8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

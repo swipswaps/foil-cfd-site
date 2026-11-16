@@ -1,10 +1,7 @@
-/**
- * FOIL.CFD - Sidebar Component with Integrated Scientific Tools.
- */
-import { useState } from 'react';
 import { DevicePanel, type DevicePick, type DetectedDevice } from './DevicePanel';
 import { ModelUploader } from './ModelUploader';
 import type { SceneContent } from '../data/scene';
+import type { CfdField } from '../App';
 
 interface Props {
   open: boolean;
@@ -26,9 +23,16 @@ interface Props {
   cadStatus: 'probing' | 'online' | 'offline';
   cadUrl: string;
   onCadRetry: () => void;
-  backendOnline: boolean;
-  selectedField: string;
-  onFieldChange: (field: string) => void;
+  backendMode: 'static' | 'cfd';
+  backendUrl: string;
+  solverAvailable: boolean;
+  onBackendRetry: () => void;
+  cfdField: CfdField;
+  onCfdFieldChange: (f: CfdField) => void;
+  cfdJobId: string | null;
+  cfdJobStatus: string;
+  cfdError: string | null;
+  onCfdSolve: () => void;
 }
 
 export function Sidebar({
@@ -39,25 +43,12 @@ export function Sidebar({
   speed, onSpeedChange,
   rotationX, rotationY, rotationZ, onRotationChange, onRotationReset,
   cadStatus, cadUrl, onCadRetry,
-  backendOnline, selectedField, onFieldChange,
+  backendMode, backendUrl, solverAvailable, onBackendRetry,
+  cfdField, onCfdFieldChange,
+  cfdJobId, cfdJobStatus, cfdError, onCfdSolve,
 }: Props) {
-  const [solving, setSolving] = useState(false);
-  const [solveMsg, setSolveMsg] = useState('');
-
-  const runSolver = async () => {
-    setSolving(true);
-    setSolveMsg('Running OpenFOAM solver...');
-    try {
-      const port = window.location.port === '5173' || window.location.port === '4173' ? '8002' : window.location.port || '8002';
-      const res = await fetch(`http://127.0.0.1:${port}/api/solve`, { method: 'POST' });
-      const data = await res.json();
-      setSolveMsg(data.message || 'Solver completed.');
-    } catch (err) {
-      setSolveMsg('Solver failed (backend unreachable).');
-    } finally {
-      setSolving(false);
-    }
-  };
+  const solving = cfdJobStatus === 'running' || cfdJobStatus === 'submitting';
+  const portLabel = backendUrl ? backendUrl.replace(/^https?:\/\//, '') : 'offline';
 
   return (
     <aside className={`app-sidebar ${open ? 'open' : ''}`} aria-hidden={!open}>
@@ -65,41 +56,19 @@ export function Sidebar({
         <span className="sidebar-brand">
           FOIL<span>.CFD</span>
         </span>
-        <button type="button" className="sidebar-close" onClick={onClose} aria-label="Close sidebar">×</button>
+        <button type="button" className="sidebar-close" onClick={onClose} aria-label="Close sidebar">
+          ×
+        </button>
       </div>
 
       <DevicePanel pick={devicePick} detected={detectedDevice} onChange={onDeviceChange} />
 
-      <ModelUploader content={sceneContent} onChange={onSceneChange} flow={flow} onFlowChange={onFlowChange} />
-
-      <div className="sidebar-section">
-        <div className="sidebar-section-label">Scientific Lab & Solver</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <button
-            type="button"
-            onClick={runSolver}
-            disabled={solving || !backendOnline}
-            className="upload-btn"
-            style={{ background: backendOnline ? '#5BC0EB' : '#38536E', color: '#0B2545', fontWeight: 600 }}
-          >
-            {solving ? 'Running Solver...' : 'Run OpenFOAM & PyVista ↗'} 
-          </button>
-          {solveMsg && <span style={{ fontSize: '0.7rem', color: '#A6D9F0' }}>{solveMsg}</span>}
-          <label style={{ fontSize: '0.75rem', color: '#7FB6D4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem' }}>
-            VTK Field:
-            <select
-              value={selectedField}
-              onChange={(e) => onFieldChange(e.target.value)}
-              style={{ background: '#0B2545', color: '#FFF', border: '1px solid #38536E', padding: '0.2rem', fontSize: '0.75rem' }}
-            >
-              <option value="U">Velocity (U)</option>
-              <option value="p">Pressure (p)</option>
-              <option value="T">Temperature (T)</option>
-              <option value="vorticity">Vorticity</option>
-            </select>
-          </label>
-        </div>
-      </div>
+      <ModelUploader
+        content={sceneContent}
+        onChange={onSceneChange}
+        flow={flow}
+        onFlowChange={onFlowChange}
+      />
 
       <div className="sidebar-section">
         <div className="sidebar-section-label">
@@ -108,19 +77,96 @@ export function Sidebar({
         </div>
         <div className="rot-slider">
           <label>Pitch (Z)</label>
-          <input type="range" min={-180} max={180} step={1} value={rotationZ} onChange={(e) => onRotationChange('z', Number(e.target.value))} /> 
+          <input type="range" min={-180} max={180} step={1} value={rotationZ}
+            onChange={(e) => onRotationChange('z', Number(e.target.value))} />
           <span>{rotationZ.toFixed(0)}°</span>
         </div>
         <div className="rot-slider">
           <label>Yaw (Y)</label>
-          <input type="range" min={-180} max={180} step={1} value={rotationY} onChange={(e) => onRotationChange('y', Number(e.target.value))} /> 
+          <input type="range" min={-180} max={180} step={1} value={rotationY}
+            onChange={(e) => onRotationChange('y', Number(e.target.value))} />
           <span>{rotationY.toFixed(0)}°</span>
         </div>
         <div className="rot-slider">
           <label>Roll (X)</label>
-          <input type="range" min={-180} max={180} step={1} value={rotationX} onChange={(e) => onRotationChange('x', Number(e.target.value))} /> 
+          <input type="range" min={-180} max={180} step={1} value={rotationX}
+            onChange={(e) => onRotationChange('x', Number(e.target.value))} />
           <span>{rotationX.toFixed(0)}°</span>
         </div>
+        <div className="speed-row">
+          <label htmlFor="flow-speed">Speed</label>
+          <input id="flow-speed" type="range" min={0.5} max={5} step={0.1}
+            value={speed} onChange={(e) => onSpeedChange(Number(e.target.value))} />
+          <span className="speed-value">{speed.toFixed(1)}×</span>
+        </div>
+        <div className="flow-approx">
+          Potential-flow visualization. Rotate the object to change
+          its angle to the wind. For real CFD, use the CAD editor.
+        </div>
+      </div>
+
+      {/* -------- Scientific tools (CFD lab) -------- */}
+      <div className="sidebar-section">
+        <div className="sidebar-section-label">
+          Scientific tools
+          <span className="sidebar-section-hint">{portLabel}</span>
+        </div>
+
+        {backendMode === 'cfd' ? (
+          <>
+            <div className="cfd-sidebar-row">
+              <label className="cfd-sidebar-label">Field</label>
+              <select
+                value={cfdField}
+                onChange={(e) => onCfdFieldChange(e.target.value as CfdField)}
+                className="upload-select"
+              >
+                <option value="p">Pressure (p)</option>
+                <option value="U">Velocity (U)</option>
+                <option value="T">Temperature (T)</option>
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={onCfdSolve}
+              disabled={!solverAvailable || solving}
+              className="upload-btn upload-btn-full"
+              title={solverAvailable ? 'Run simpleFoam on NACA0012 case' : 'OpenFOAM binary not in container'}
+            >
+              {solving
+                ? (cfdJobStatus === 'submitting' ? 'Submitting…' : 'Solving…')
+                : solverAvailable
+                ? 'Run simpleFoam'
+                : 'Solver unavailable'}
+            </button>
+
+            {cfdJobId && cfdJobStatus !== 'idle' && (
+              <div className="cfd-sidebar-status">
+                <span className={`cfd-status-dot cfd-status-${cfdJobStatus}`} />
+                Job {cfdJobId.slice(0, 8)} · {cfdJobStatus}
+              </div>
+            )}
+
+            {cfdError && <div className="upload-error">{cfdError}</div>}
+
+            <a href="#cfd" className="cfd-sidebar-jump" onClick={onClose}>
+              Jump to 3D lab ↓
+            </a>
+          </>
+        ) : (
+          <div className="flow-approx">
+            Backend offline. Start with <code>docker compose up -d</code>.
+            <button
+              type="button"
+              onClick={onBackendRetry}
+              className="upload-reset"
+              style={{ marginLeft: '0.5rem' }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="sidebar-section">
@@ -128,17 +174,32 @@ export function Sidebar({
         {cadStatus === 'online' ? (
           <a href={cadUrl} target="_blank" rel="noreferrer" className="cad-link">
             Open SketchForge-3D ↗
+            <span className="cad-link-hint">import STL · booleans · export STL/OBJ/STEP</span>
           </a>
+        ) : cadStatus === 'probing' ? (
+          <span className="cad-status">Checking local editor…</span>
         ) : (
-          <span className="cad-status">Not running. Start with <code>docker compose up -d</code>.</span>
+          <div className="cad-offline">
+            <span className="cad-status">
+              Not running. Start with <code>docker compose up -d</code>.
+            </span>
+            <button type="button" className="upload-btn" onClick={onCadRetry}>Retry</button>
+          </div>
         )}
       </div>
 
       <nav className="sidebar-nav">
         <a href="#top" onClick={onClose}>Overview</a>
+        <a href="#cfd" onClick={onClose}>CFD Lab</a>
         <a href="#readme" onClick={onClose}>README</a>
         <a href="#projects" onClick={onClose}>Projects</a>
       </nav>
+
+      <div className="sidebar-foot">
+        <a href="https://github.com/swipswaps/foil-cfd-site" target="_blank" rel="noreferrer">
+          GitHub ↗
+        </a>
+      </div>
     </aside>
   );
 }

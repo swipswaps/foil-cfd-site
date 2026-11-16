@@ -10,6 +10,8 @@ import { useBackendProbe } from './hooks/useBackendProbe';
 import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
 import type { SceneContent } from './data/scene';
 
+export type CfdField = 'p' | 'U' | 'T';
+
 const CfdLab = lazy(() =>
   import('./sections/CfdLab').then((m) => ({ default: m.CfdLab }))
 );
@@ -51,6 +53,13 @@ export default function App() {
   const [rotationY, setRotationY] = useState(0);
   const [rotationZ, setRotationZ] = useState(0);
 
+  // ---- CFD tool state (single source of truth) ----
+  const [cfdField, setCfdField] = useState<CfdField>('p');
+  const [cfdJobId, setCfdJobId] = useState<string | null>(null);
+  const [cfdJobStatus, setCfdJobStatus] = useState<string>('idle');
+  const [cfdError, setCfdError] = useState<string | null>(null);
+  const [cfdDatasetUrl, setCfdDatasetUrl] = useState<string | null>(null);
+
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
 
@@ -77,6 +86,57 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Default dataset URL once backend is online
+  useEffect(() => {
+    if (backend.mode === 'cfd' && backend.backendOrigin && !cfdDatasetUrl) {
+      setCfdDatasetUrl(`${backend.backendOrigin}/api/jobs/default/surface.vtp`);
+    }
+  }, [backend.mode, backend.backendOrigin, cfdDatasetUrl]);
+
+  // Poll active job
+  useEffect(() => {
+    if (!cfdJobId || !backend.backendOrigin) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${backend.backendOrigin}/api/jobs/${cfdJobId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setCfdJobStatus(data.status);
+        if (data.status === 'completed') {
+          setCfdDatasetUrl(`${backend.backendOrigin}/api/jobs/${cfdJobId}/surface.vtp`);
+        } else if (data.status !== 'failed') {
+          setTimeout(poll, 1500);
+        }
+      } catch (err) {
+        if (!cancelled) setCfdError(err instanceof Error ? err.message : 'Poll failed');
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [cfdJobId, backend.backendOrigin]);
+
+  const startCfdSolve = async () => {
+    if (!backend.backendOrigin) return;
+    setCfdError(null);
+    setCfdJobStatus('submitting');
+    try {
+      const res = await fetch(`${backend.backendOrigin}/api/solve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ case_id: 'naca0012' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setCfdJobId(data.job_id);
+      setCfdJobStatus('queued');
+    } catch (err) {
+      setCfdError(err instanceof Error ? err.message : 'Submit failed');
+      setCfdJobStatus('idle');
+    }
+  };
 
   const handleRotation = (axis: 'x' | 'y' | 'z', v: number) => {
     if (axis === 'x') setRotationX(v);
@@ -112,6 +172,16 @@ export default function App() {
           cadStatus={cad.status}
           cadUrl={cad.url}
           onCadRetry={cad.probe}
+          backendMode={backend.mode}
+          backendUrl={backend.backendOrigin}
+          solverAvailable={backend.solverAvailable}
+          onBackendRetry={backend.probe}
+          cfdField={cfdField}
+          onCfdFieldChange={setCfdField}
+          cfdJobId={cfdJobId}
+          cfdJobStatus={cfdJobStatus}
+          cfdError={cfdError}
+          onCfdSolve={startCfdSolve}
         />
         {sidebarOpen && (
           <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
@@ -132,11 +202,15 @@ export default function App() {
             rotationY={rotationY}
             rotationZ={rotationZ}
           />
-          {backend.mode === 'cfd' && (
+          {backend.mode === 'cfd' && cfdDatasetUrl && backend.backendOrigin && (
             <Suspense fallback={<CfdLabSkeleton />}>
               <CfdLab
                 backendUrl={backend.backendOrigin}
                 solverAvailable={backend.solverAvailable}
+                field={cfdField}
+                datasetUrl={cfdDatasetUrl}
+                jobId={cfdJobId}
+                jobStatus={cfdJobStatus}
               />
             </Suspense>
           )}
