@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { BackendBadge } from './components/BackendBadge';
 import { type DevicePick, type DetectedDevice } from './components/DevicePanel';
 import { Hero } from './sections/Hero';
+import { CfdLab } from './sections/CfdLab';
 import { ReadmeSection } from './sections/ReadmeSection';
 import { ProjectShowcase } from './sections/ProjectShowcase';
 import { useBackendProbe } from './hooks/useBackendProbe';
@@ -43,7 +44,10 @@ export default function App() {
     update();
     window.addEventListener('resize', update);
     window.addEventListener('orientationchange', update);
-    return () => {
+    const backendPort = typeof window !== 'undefined' ? (window.location.port === '5173' || window.location.port === '4173' || window.location.port === '4174' ? '8002' : window.location.port) : '8002';
+  const datasetUrl = `http://127.0.0.1:${backendPort}/api/jobs/default/surface.vtp`;
+
+  return () => {
       window.removeEventListener('resize', update);
       window.removeEventListener('orientationchange', update);
     };
@@ -62,7 +66,10 @@ export default function App() {
       if (e.key === 'Escape') setSidebarOpen(false);
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const backendPort = typeof window !== 'undefined' ? (window.location.port === '5173' || window.location.port === '4173' || window.location.port === '4174' ? '8002' : window.location.port) : '8002';
+  const datasetUrl = `http://127.0.0.1:${backendPort}/api/jobs/default/surface.vtp`;
+
+  return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const handleRotation = (axis: 'x' | 'y' | 'z', v: number) => {
@@ -76,6 +83,9 @@ export default function App() {
     setRotationY(0);
     setRotationZ(0);
   };
+
+  const backendPort = typeof window !== 'undefined' ? (window.location.port === '5173' || window.location.port === '4173' || window.location.port === '4174' ? '8002' : window.location.port) : '8002';
+  const datasetUrl = `http://127.0.0.1:${backendPort}/api/jobs/default/surface.vtp`;
 
   return (
     <div className="app-shell">
@@ -127,6 +137,10 @@ export default function App() {
             rotationX={rotationX}
             rotationY={rotationY}
             rotationZ={rotationZ}
+          />
+          <CfdLab
+            backendOnline={backend.status === "online"}
+            datasetUrl={datasetUrl}
           />
           <ReadmeSection />
           <ProjectShowcase />

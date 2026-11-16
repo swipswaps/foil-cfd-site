@@ -907,3 +907,5 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   text-transform: none;
 }
 .sidebar-reset:hover { color: #A6D9F0; }
+
+.cfd-laboratory-section { width: 100%; box-sizing: border-box; }

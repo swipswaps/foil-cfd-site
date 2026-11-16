@@ -36,6 +36,15 @@ export function FlowParticles({
     return arr;
   }, [count, mode]);
 
+  // Per-particle streamline Y — the y-coordinate each particle would
+  // have if there were no obstacle. Restoring force uses this.
+  const streamlinesRef = useRef<Float32Array | null>(null);
+  if (!streamlinesRef.current || streamlinesRef.current.length !== count) {
+    const s = new Float32Array(count);
+    for (let i = 0; i < count; i++) s[i] = initial[i * 3 + 1];
+    streamlinesRef.current = s;
+  }
+
   const sphere = useMemo(() => {
     if (!flowSphere) return null;
     return {
@@ -47,6 +56,9 @@ export function FlowParticles({
       hy: flowSphere.halfExtents?.y ?? 0,
       hz: flowSphere.halfExtents?.z ?? 0,
       hasOBB: !!flowSphere.halfExtents,
+      effHalfX: flowSphere.halfExtents
+        ? Math.max(flowSphere.halfExtents.x, 0.3)
+        : Math.max(flowSphere.radius, 0.3),
     };
   }, [flowSphere]);
 
@@ -57,10 +69,11 @@ export function FlowParticles({
     const geom = pointsRef.current?.geometry;
     if (!geom) return;
     const pos = geom.attributes.position.array as Float32Array;
-    
+    const streamlines = streamlinesRef.current;
+    if (!streamlines) return;
+
     const subSteps = 3;
-    const frameDt = Math.min(delta, 0.05) * speed;
-    const dt = frameDt / subSteps;
+    const dt = (Math.min(delta, 0.05) * speed) / subSteps;
 
     const q = bodyQuaternion ?? IDENTITY;
     const qInv = q.clone().invert();
@@ -80,8 +93,9 @@ export function FlowParticles({
 
     for (let step = 0; step < subSteps; step++) {
       for (let i = 0; i < pos.length; i += 3) {
+        const idx = i / 3;
         const px = pos[i], py = pos[i + 1], pz = pos[i + 2];
-        let vx: number, vy: number, vz: number;
+        let vx = 0, vy = 0, vz = 0;
 
         if (sphere) {
           p.set(px, py, pz).applyQuaternion(qInv);
@@ -91,40 +105,29 @@ export function FlowParticles({
           const r2 = lx * lx + ly * ly + lz * lz;
 
           if (sphere.hasOBB) {
-            const halfX = sphere.hx, halfY = sphere.hy, halfZ = sphere.hz;
-            const outsideX = Math.max(Math.abs(lx) - halfX, 0);
-            const outsideY = Math.max(Math.abs(ly) - halfY, 0);
-            const outsideZ = Math.max(Math.abs(lz) - halfZ, 0);
-            const outsideDist = Math.sqrt(
-              outsideX * outsideX + outsideY * outsideY + outsideZ * outsideZ
-            );
+            const outsideX = Math.max(Math.abs(lx) - sphere.hx, 0);
+            const outsideY = Math.max(Math.abs(ly) - sphere.hy, 0);
+            const outsideZ = Math.max(Math.abs(lz) - sphere.hz, 0);
+            const od = Math.sqrt(outsideX * outsideX + outsideY * outsideY + outsideZ * outsideZ);
 
-            if (outsideDist < 0.35) {
-              const push = U * 2.0 * Math.max(0, 1 - outsideDist / 0.35);
+            if (od < 1e-6) {
+              const pushX = sphere.hx - Math.abs(lx);
+              const pushY = sphere.hy - Math.abs(ly);
+              const pushZ = sphere.hz - Math.abs(lz);
+              const minPush = Math.min(pushX, pushY, pushZ);
               let nx = 0, ny = 0, nz = 0;
-              if (outsideDist < 1e-6) {
-                const pushX = halfX - Math.abs(lx);
-                const pushY = halfY - Math.abs(ly);
-                const pushZ = halfZ - Math.abs(lz);
-                const minPush = Math.min(pushX, pushY, pushZ);
-                if (minPush === pushX) nx = Math.sign(lx) || 1;
-                else if (minPush === pushY) ny = Math.sign(ly) || 1;
-                else nz = Math.sign(lz) || 1;
-                p.set(nx * push, ny * push, nz * push).applyQuaternion(q);
-                vx = windWorld.x + p.x;
-                vy = windWorld.y + p.y;
-                vz = windWorld.z + p.z;
-                pos[i] += vx * dt;
-                pos[i + 1] += vy * dt;
-                pos[i + 2] += vz * dt;
-                continue;
-              }
+              if (minPush === pushX) nx = Math.sign(lx) || 1;
+              else if (minPush === pushY) ny = Math.sign(ly) || 1;
+              else nz = Math.sign(lz) || 1;
+              vx = windWorld.x + nx * U * 2;
+              vy = windWorld.y + ny * U * 2;
+              vz = windWorld.z + nz * U * 2;
+            } else if (od < 0.4) {
+              const push = U * 2.2 * (1 - od / 0.4);
               const r = Math.sqrt(r2) + 1e-6;
-              nx = lx / r; ny = ly / r; nz = lz / r;
-              p.set(nx * push, ny * push, nz * push).applyQuaternion(q);
-              vx = windWorld.x + p.x;
-              vy = windWorld.y + p.y;
-              vz = windWorld.z + p.z;
+              vx = windWorld.x + (lx / r) * push;
+              vy = windWorld.y + (ly / r) * push;
+              vz = windWorld.z + (lz / r) * push;
             } else {
               vx = windWorld.x; vy = windWorld.y; vz = windWorld.z;
             }
@@ -133,18 +136,23 @@ export function FlowParticles({
               const r = Math.sqrt(r2);
               const nx = lx / r, ny = ly / r, nz = lz / r;
               const uDotN = windWorld.x * nx + windWorld.y * ny + windWorld.z * nz;
-              const ratio = sphere.R / r;
-              const s = ratio * ratio * ratio / 2;
+              const s = Math.pow(sphere.R / r, 3) / 2;
               vx = windWorld.x + s * (windWorld.x - 3 * nx * uDotN);
               vy = windWorld.y + s * (windWorld.y - 3 * ny * uDotN);
               vz = windWorld.z + s * (windWorld.z - 3 * nz * uDotN);
             } else {
               const r = Math.sqrt(r2) + 1e-6;
-              const push = U * 0.4;
-              vx = windWorld.x + (lx / r) * push;
-              vy = windWorld.y + (ly / r) * push;
-              vz = windWorld.z + (lz / r) * push;
+              vx = windWorld.x + (lx / r) * U * 0.5;
+              vy = windWorld.y + (ly / r) * U * 0.5;
+              vz = windWorld.z + (lz / r) * U * 0.5;
             }
+          }
+
+          // RESTORE toward streamline once past the object
+          const downstream = px - sphere.cx - sphere.effHalfX;
+          if (downstream > 0) {
+            const k = Math.min(downstream / (sphere.effHalfX + 0.5) * 1.6, 3.0);
+            vy += (streamlines[idx] - py) * k;
           }
         } else {
           p.set(px, py, pz).applyQuaternion(qInv);
@@ -152,25 +160,29 @@ export function FlowParticles({
 
           let ux = windLocal.x, uy = windLocal.y, uz = windLocal.z;
 
-          // Non-blocking transverse thickness deflection over airfoil body (-1 < lx < 1)
           if (lx > -1.1 && lx < 1.1 && Math.abs(ly) < 0.3) {
-            const thicknessEnvelop = Math.max(0, 1 - (lx * lx) / 1.21);
-            const upwardBias = Math.sign(ly || 1) * U * 0.6 * thicknessEnvelop;
-            uy += upwardBias;
+            const env = Math.max(0, 1 - (lx * lx) / 1.21);
+            uy += Math.sign(ly || 1) * U * 0.6 * env;
           }
 
-          // Vortex at quarter chord (-0.5, 0) for lift circulation
           const dxV = lx + 0.5;
           const dyV = ly;
           const rV2 = dxV * dxV + dyV * dyV + 0.15;
-          let uV = -gamma / (2 * Math.PI) * dyV / rV2;
-          let vV = gamma / (2 * Math.PI) * dxV / rV2;
+          const decay = lx > 0.5 ? Math.exp(-(lx - 0.5) / 0.6) : 1;
+          let uV = -gamma / (2 * Math.PI) * dyV / rV2 * decay;
+          let vV = gamma / (2 * Math.PI) * dxV / rV2 * decay;
           const magV = uV * uV + vV * vV;
           if (magV > vMax * vMax) {
             const s = vMax / Math.sqrt(magV);
             uV *= s; vV *= s;
           }
           ux += uV; uy += vV;
+
+          // RESTORE toward streamline once past trailing edge
+          if (lx > 0.5) {
+            const k = Math.min((lx - 0.5) * 1.8, 2.8);
+            uy += (streamlines[idx] - ly) * k;
+          }
 
           v.set(ux, uy, uz).applyQuaternion(q);
           vx = v.x; vy = v.y; vz = v.z;
@@ -179,19 +191,24 @@ export function FlowParticles({
         pos[i] += vx * dt;
         pos[i + 1] += vy * dt;
         pos[i + 2] += vz * dt;
-
-        const vmag2 = vx * vx + vy * vy + vz * vz;
-        const outX = pos[i] > 5 || pos[i] < -5;
-        const outY = pos[i + 1] > 2 || pos[i + 1] < -2;
-        const outZ = pos[i + 2] > zMin + span || pos[i + 2] < zMin;
-        const stuck = vmag2 < 0.005;
-        if (outX || outY || outZ || stuck) {
-          pos[i] = -5;
-          pos[i + 1] = (Math.random() - 0.5) * 4;
-          pos[i + 2] = zMin + Math.random() * span;
-        }
       }
     }
+
+    // Out-of-bounds reset (once per frame, after all substeps)
+    for (let i = 0; i < pos.length; i += 3) {
+      const idx = i / 3;
+      const outX = pos[i] > 5 || pos[i] < -5;
+      const outY = pos[i + 1] > 2 || pos[i + 1] < -2;
+      const outZ = pos[i + 2] > zMin + span || pos[i + 2] < zMin;
+      if (outX || outY || outZ) {
+        const newY = (Math.random() - 0.5) * 4;
+        pos[i] = -5;
+        pos[i + 1] = newY;
+        pos[i + 2] = zMin + Math.random() * span;
+        streamlines[idx] = newY;
+      }
+    }
+
     geom.attributes.position.needsUpdate = true;
   });
 

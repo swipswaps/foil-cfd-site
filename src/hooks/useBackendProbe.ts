@@ -9,7 +9,7 @@ export interface BackendState {
 }
 
 const DEV_BACKEND = 'http://127.0.0.1:8000';
-const HTTPS_BACKEND = 'http://localhost:8000';
+const HTTPS_BACKEND = 'http://localhost:8002';
 
 async function probeUrl(base: string, timeoutMs = 2500): Promise<{ online: boolean; reason: string }> {
   const ctrl = new AbortController();

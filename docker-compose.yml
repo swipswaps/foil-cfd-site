@@ -1,6 +1,17 @@
 services:
   backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: foil-cfd-site-backend:light
+    container_name: foil-cfd-site-backend
     restart: unless-stopped
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./backend/jobs:/app/jobs
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 20s
+      timeout: 4s
+      retries: 3
