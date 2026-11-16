@@ -41,7 +41,7 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
     let raf = 0;
     const tryInit = () => {
       if (cancelled || initFailedRef.current || vtkRef.current) return;
-      if (container.clientWidth === 0 || container.clientHeight === 0) {
+      if (container.getBoundingClientRect().width < 2 && container.clientWidth === 0) {
         raf = requestAnimationFrame(tryInit);
         return;
       }
