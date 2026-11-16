@@ -909,3 +909,60 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
 .sidebar-reset:hover { color: #A6D9F0; }
 
 .cfd-laboratory-section { width: 100%; box-sizing: border-box; }
+
+
+/* =========================================================================
+   CFD VTK FALLBACK
+   ========================================================================= */
+.cfd-vtk-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 360px;
+  padding: 2rem 1.25rem;
+  background: #0B1A24;
+  border: 1px solid #7F1D1D;
+  border-radius: 8px;
+}
+.cfd-vtk-fallback-body {
+  text-align: center;
+  max-width: 420px;
+}
+.cfd-vtk-fallback-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #F87171;
+  margin-bottom: 0.5rem;
+}
+.cfd-vtk-fallback-msg {
+  font-size: 0.72rem;
+  color: #FCA5A5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: rgba(127, 29, 29, 0.25);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.75rem;
+  word-break: break-word;
+}
+.cfd-vtk-fallback-hint {
+  font-size: 0.7rem;
+  color: #94AEBF;
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+.cfd-vtk-fallback-btn {
+  background: #132A38;
+  color: #7FB6D4;
+  border: 1px solid #1E3A4A;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.cfd-vtk-fallback-btn:hover {
+  background: #1A3A4E;
+  border-color: #5BC0EB;
+  color: #A6D9F0;
+}

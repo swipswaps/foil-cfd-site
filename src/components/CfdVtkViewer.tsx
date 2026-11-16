@@ -1,7 +1,3 @@
-/**
- * FOIL.CFD - VTK.js Scientific 3D Viewer Component.
- * Reference: Kitware VTK.js Documentation (https://kitware.github.io/vtk-js/)[cite: 5].
- */
 import { useEffect, useRef, useState } from 'react';
 import '@kitware/vtk.js/Rendering/Profiles/Geometry';
 import vtkGenericRenderWindow from '@kitware/vtk.js/Rendering/Misc/GenericRenderWindow';
@@ -13,112 +9,162 @@ interface Props {
   datasetUrl: string;
 }
 
+interface VtkRefs {
+  view: ReturnType<typeof vtkGenericRenderWindow.newInstance>;
+  reader: ReturnType<typeof vtkXMLPolyDataReader.newInstance>;
+  mapper: ReturnType<typeof vtkMapper.newInstance>;
+  actor: ReturnType<typeof vtkActor.newInstance>;
+  ro?: ResizeObserver;
+}
+
 export function CfdVtkViewer({ datasetUrl }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState('Loading scientific dataset...');
-  const [field, setField] = useState('U');
+  const vtkRef = useRef<VtkRefs | null>(null);
+  const initFailedRef = useRef(false);
+  const [status, setStatus] = useState('Waiting for layout…');
+  const [field, setField] = useState('p');
 
+  // -------------------------------------------------------------------------
+  // Effect 1: initialise VTK once. Defers until the container has real
+  // dimensions; guards WebGL2 availability; every VTK call in try/catch.
+  // -------------------------------------------------------------------------
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    let cancelled = false;
+    let raf = 0;
 
-    const controller = new AbortController();
-    const view = vtkGenericRenderWindow.newInstance({
-      background: [0.035, 0.09, 0.16],
-    });
-
-    const reader = vtkXMLPolyDataReader.newInstance();
-    const mapper = vtkMapper.newInstance();
-    const actor = vtkActor.newInstance();
-
-    view.setContainer(container);
-    view.resize();
-
-    mapper.setInputConnection(reader.getOutputPort());
-    actor.setMapper(mapper);
-
-    const renderer = view.getRenderer();
-    renderer.addActor(actor);
-    renderer.resetCamera();
-
-    async function loadDataset() {
-      try {
-        const response = await fetch(datasetUrl, {
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const buffer = await response.arrayBuffer();
-        if (controller.signal.aborted) return;
-
-        reader.parseAsArrayBuffer(buffer);
-        const data = reader.getOutputData(0);
-
-        if (!data) {
-          throw new Error('VTK dataset contains no output');
-        }
-
-        const pointArrays = data.getPointData().getArrays();
-        const cellArrays = data.getCellData().getArrays();
-        const arrays = [...pointArrays, ...cellArrays];
-        const selected = arrays.find((item) => item.getName() === field);
-
-        if (selected) {
-          mapper.setScalarVisibility(true);
-          mapper.setColorByArrayName(field);
-        } else {
-          mapper.setScalarVisibility(false);
-        }
-
-        mapper.setScalarModeToUsePointFieldData();
-        renderer.resetCamera();
-        view.getRenderWindow().render();
-
-        setStatus(`Loaded OpenFOAM Dataset: ${data.getNumberOfPoints()} points[cite: 5]`);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setStatus(error instanceof Error ? error.message : 'Dataset loading failed');
+    const tryInit = () => {
+      if (cancelled || initFailedRef.current || vtkRef.current) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w === 0 || h === 0) {
+        raf = requestAnimationFrame(tryInit);
+        return;
       }
-    }
+      try {
+        const probe = document.createElement('canvas');
+        const gl = probe.getContext('webgl2');
+        if (!gl) {
+          initFailedRef.current = true;
+          setStatus('WebGL2 not available in this browser');
+          return;
+        }
 
-    loadDataset();
+        const view = vtkGenericRenderWindow.newInstance({
+          background: [0.043, 0.071, 0.102],
+        });
+        view.setContainer(container);
+        view.resize();
 
-    const observer = new ResizeObserver(() => {
-      view.resize();
-      view.getRenderWindow().render();
-    });
+        const reader = vtkXMLPolyDataReader.newInstance();
+        const mapper = vtkMapper.newInstance();
+        const actor = vtkActor.newInstance();
+        mapper.setInputConnection(reader.getOutputPort());
+        actor.setMapper(mapper);
+        view.getRenderer().addActor(actor);
 
-    observer.observe(container);
+        const ro = new ResizeObserver(() => {
+          const cur = vtkRef.current;
+          if (!cur) return;
+          try {
+            cur.view.resize();
+            cur.view.getRenderWindow().render();
+          } catch {
+            /* ignore transient resize failures */
+          }
+        });
+        ro.observe(container);
+
+        vtkRef.current = { view, reader, mapper, actor, ro };
+        setStatus('Ready — loading dataset…');
+      } catch (err) {
+        initFailedRef.current = true;
+        setStatus(
+          err instanceof Error ? `VTK init: ${err.message}` : 'VTK init failed'
+        );
+      }
+    };
+
+    raf = requestAnimationFrame(tryInit);
 
     return () => {
-      controller.abort();
-      observer.disconnect();
-      actor.delete();
-      mapper.delete();
-      reader.delete();
-      view.delete();
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      const vtk = vtkRef.current;
+      if (vtk) {
+        try { vtk.ro?.disconnect(); } catch { /* noop */ }
+        try { vtk.actor.delete(); } catch { /* noop */ }
+        try { vtk.mapper.delete(); } catch { /* noop */ }
+        try { vtk.reader.delete(); } catch { /* noop */ }
+        try { vtk.view.delete(); } catch { /* noop */ }
+        vtkRef.current = null;
+      }
     };
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // Effect 2: load / reload dataset when URL or field changes. Reuses the
+  // existing VTK instance — no new WebGL context per toggle.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      // Wait until VTK is initialised (Effect 1 does it async)
+      let waited = 0;
+      while (!cancelled && !vtkRef.current && !initFailedRef.current && waited < 100) {
+        await new Promise((r) => requestAnimationFrame(r));
+        waited++;
+      }
+      if (cancelled || initFailedRef.current) return;
+      const vtk = vtkRef.current;
+      if (!vtk) return;
+
+      try {
+        const res = await fetch(datasetUrl, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buf = await res.arrayBuffer();
+        if (cancelled) return;
+        vtk.reader.parseAsArrayBuffer(buf);
+        const data = vtk.reader.getOutputData(0);
+        if (!data) throw new Error('VTK dataset empty');
+
+        const names = data.getPointData().getArrays().map((a) => a.getName());
+        if (names.includes(field)) {
+          vtk.mapper.setScalarVisibility(true);
+          vtk.mapper.setColorByArrayName(field);
+          vtk.mapper.setScalarModeToUsePointFieldData();
+        } else {
+          vtk.mapper.setScalarVisibility(false);
+        }
+        vtk.view.getRenderer().resetCamera();
+        vtk.view.getRenderWindow().render();
+        setStatus(`${data.getNumberOfPoints()} pts · ${data.getNumberOfCells()} cells`);
+      } catch (err) {
+        if (cancelled) return;
+        setStatus(err instanceof Error ? err.message : 'Load failed');
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
   }, [datasetUrl, field]);
 
   return (
-    <section className="cfd-vtk-viewer">
-      <header className="vtk-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 1rem', background: '#102C4A', color: '#FFF' }}>
-        <p style={{ margin: 0, fontSize: '0.8rem' }}>{status}</p>
-        <label style={{ fontSize: '0.8rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          Field:
-          <select value={field} onChange={(e) => setField(e.target.value)} style={{ background: '#0B2545', color: '#FFF', border: '1px solid #38536E', padding: '0.2rem' }}>
-            <option value="U">Velocity (U)</option>
+    <section className="cfd-vtk">
+      <header className="cfd-vtk-head">
+        <span>{status}</span>
+        <label>
+          Field
+          <select value={field} onChange={(e) => setField(e.target.value)}>
             <option value="p">Pressure (p)</option>
+            <option value="U">Velocity (U)</option>
             <option value="T">Temperature (T)</option>
-            <option value="vorticity">Vorticity</option>
           </select>
         </label>
       </header>
-      <div ref={containerRef} style={{ width: '100%', height: '420px', background: '#091729' }} />
+      <div ref={containerRef} className="cfd-vtk-canvas" />
     </section>
   );
 }

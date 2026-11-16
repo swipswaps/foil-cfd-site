@@ -1,69 +1,98 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CfdVtkViewer } from '../components/CfdVtkViewer';
+import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
 import { CpPolarChart } from '../components/CpPolarChart';
 
 interface Props {
-  backendOnline: boolean;
-  datasetUrl: string;
+  backendUrl: string;
+  solverAvailable: boolean;
 }
 
-export function CfdLab({ backendOnline, datasetUrl }: Props) {
-  const [solving, setSolving] = useState(false);
-  const [solveMsg, setSolveMsg] = useState('');
+export function CfdLab({ backendUrl, solverAvailable }: Props) {
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<string>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [datasetUrl, setDatasetUrl] = useState<string>(
+    `${backendUrl}/api/jobs/default/surface.vtp`
+  );
 
-  const runSolver = async () => {
-    setSolving(true);
-    setSolveMsg('Running OpenFOAM simpleFoam & PyVista extraction...');
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${backendUrl}/api/jobs/${jobId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setJobStatus(data.status);
+        if (data.status === 'completed') {
+          setDatasetUrl(`${backendUrl}/api/jobs/${jobId}/surface.vtp`);
+        } else if (data.status !== 'failed') {
+          setTimeout(poll, 1500);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Poll failed');
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [jobId, backendUrl]);
+
+  const startSolve = async () => {
+    setError(null);
+    setJobStatus('submitting');
     try {
-      const backendPort = typeof window !== 'undefined' ? (window.location.port === '5173' || window.location.port === '4173' || window.location.port === '4174' ? '8002' : window.location.port) : '8002';
-      const res = await fetch(`http://127.0.0.1:${backendPort}/api/solve`, { method: 'POST' });
+      const res = await fetch(`${backendUrl}/api/solve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ case_id: 'naca0012' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setSolveMsg(data.message || 'Solver completed successfully.');
+      setJobId(data.job_id);
+      setJobStatus('queued');
     } catch (err) {
-      setSolveMsg('Solver execution failed (backend unreachable).');
-    } finally {
-      setSolving(false);
+      setError(err instanceof Error ? err.message : 'Submit failed');
+      setJobStatus('idle');
     }
   };
 
   return (
-    <section id="cfd-lab" className="cfd-laboratory-section" style={{ padding: '3rem 1.5rem', background: '#071728', borderTop: '1px solid #1E3A4A' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <header style={{ marginBottom: '2rem', textAlign: 'center' }}>
-          <h2 style={{ fontSize: '1.8rem', color: '#E2F4FF', marginBottom: '0.5rem' }}>
-            OpenFOAM & PyVista Scientific Laboratory
-          </h2>
-          <p style={{ color: '#7FB6D4', fontSize: '0.95rem', marginBottom: '1rem' }}>
-            {backendOnline
-              ? 'Connected to Docker OpenFOAM Solver Backend. Live 3D surface mesh & pressure distributions.'
-              : 'Docker backend offline (showing pre-computed OpenFOAM datasets). Start backend container for live solving.'}
-          </p>
-          <button
-            onClick={runSolver}
-            disabled={solving || !backendOnline}
-            style={{
-              background: backendOnline ? '#5BC0EB' : '#38536E',
-              color: '#0B2545',
-              border: 'none',
-              padding: '0.6rem 1.2rem',
-              borderRadius: '4px',
-              fontWeight: 600,
-              cursor: backendOnline ? 'pointer' : 'not-allowed',
-            }}
-          >
-            {solving ? 'Running Solver...' : 'Run OpenFOAM Solver & PyVista Extract ↗'}
-          </button>
-          {solveMsg && <p style={{ color: '#A6D9F0', fontSize: '0.85rem', marginTop: '0.5rem' }}>{solveMsg}</p>}
-        </header>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '2rem' }}>
-          <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid #1E3A4A' }}>
-            <CfdVtkViewer datasetUrl={datasetUrl} />
-          </div>
-          <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid #1E3A4A', background: '#0B2545', padding: '0.5rem' }}>
-            <CpPolarChart />
-          </div>
+    <section id="cfd" className="cfd-lab">
+      <header className="cfd-lab-head">
+        <h2>CFD Laboratory</h2>
+        <div className="cfd-lab-status">
+          <span>
+            {solverAvailable
+              ? 'OpenFOAM ready'
+              : 'Solver unavailable · showing default mesh'}
+          </span>
+          {solverAvailable && (
+            <button
+              type="button"
+              onClick={startSolve}
+              disabled={jobStatus === 'running' || jobStatus === 'submitting'}
+              className="cfd-solve-btn"
+            >
+              {jobStatus === 'running'
+                ? 'Solving…'
+                : jobStatus === 'submitting'
+                ? 'Submitting…'
+                : 'Run simpleFoam'}
+            </button>
+          )}
         </div>
+      </header>
+      {jobId && (
+        <div className="cfd-job-status">Job {jobId.slice(0, 8)} · {jobStatus}</div>
+      )}
+      {error && <div className="cfd-error">{error}</div>}
+      <div className="cfd-lab-grid">
+        <CfdVtkBoundary>
+          <CfdVtkViewer datasetUrl={datasetUrl} />
+        </CfdVtkBoundary>
+        <CpPolarChart />
       </div>
     </section>
   );
