@@ -966,3 +966,22 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   border-color: #5BC0EB;
   color: #A6D9F0;
 }
+
+
+.cfd-vtk-skeleton {
+  min-height: 360px;
+  border-radius: 8px;
+  background: linear-gradient(
+    100deg,
+    #0B1A24 0%,
+    #102C4A 40%,
+    #0B1A24 80%
+  );
+  background-size: 300% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  border: 1px solid #1E3A4A;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: -100% 50%; }
+}

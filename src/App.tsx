@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { NavBar } from './components/NavBar';
 import { Sidebar } from './components/Sidebar';
 import { BackendBadge } from './components/BackendBadge';
 import { type DevicePick, type DetectedDevice } from './components/DevicePanel';
 import { Hero } from './sections/Hero';
-import { CfdLab } from './sections/CfdLab';
 import { ReadmeSection } from './sections/ReadmeSection';
 import { ProjectShowcase } from './sections/ProjectShowcase';
 import { useBackendProbe } from './hooks/useBackendProbe';
 import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
 import type { SceneContent } from './data/scene';
+
+const CfdLab = lazy(() =>
+  import('./sections/CfdLab').then((m) => ({ default: m.CfdLab }))
+);
 
 function detectDevice(): DetectedDevice {
   if (typeof window === 'undefined') return 'desktop';
@@ -19,6 +22,21 @@ function detectDevice(): DetectedDevice {
   return 'desktop';
 }
 
+function CfdLabSkeleton() {
+  return (
+    <section className="cfd-lab">
+      <header className="cfd-lab-head">
+        <h2>CFD Laboratory</h2>
+        <div className="cfd-lab-status"><span>Loading scientific viewer…</span></div>
+      </header>
+      <div className="cfd-lab-grid">
+        <div className="cfd-vtk-skeleton" />
+        <div className="cfd-vtk-skeleton" />
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const backend = useBackendProbe();
   const cad = useSketchForgeProbe();
@@ -26,10 +44,7 @@ export default function App() {
   const [devicePick, setDevicePick] = useState<DevicePick>(() => detectDevice());
   const [detectedDevice, setDetectedDevice] = useState<DetectedDevice>(detectDevice);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sceneContent, setSceneContent] = useState<SceneContent>({
-    kind: 'default',
-    token: 0,
-  });
+  const [sceneContent, setSceneContent] = useState<SceneContent>({ kind: 'default', token: 0 });
   const [flow, setFlow] = useState(true);
   const [speed, setSpeed] = useState(2.0);
   const [rotationX, setRotationX] = useState(0);
@@ -44,10 +59,7 @@ export default function App() {
     update();
     window.addEventListener('resize', update);
     window.addEventListener('orientationchange', update);
-    const backendPort = typeof window !== 'undefined' ? (window.location.port === '5173' || window.location.port === '4173' || window.location.port === '4174' ? '8002' : window.location.port) : '8002';
-  const datasetUrl = `http://127.0.0.1:${backendPort}/api/jobs/default/surface.vtp`;
-
-  return () => {
+    return () => {
       window.removeEventListener('resize', update);
       window.removeEventListener('orientationchange', update);
     };
@@ -55,10 +67,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-device', effectiveDevice);
-    document.documentElement.setAttribute(
-      'data-sidebar',
-      sidebarOpen ? 'open' : 'closed'
-    );
+    document.documentElement.setAttribute('data-sidebar', sidebarOpen ? 'open' : 'closed');
   }, [effectiveDevice, sidebarOpen]);
 
   useEffect(() => {
@@ -66,10 +75,7 @@ export default function App() {
       if (e.key === 'Escape') setSidebarOpen(false);
     };
     window.addEventListener('keydown', onKey);
-    const backendPort = typeof window !== 'undefined' ? (window.location.port === '5173' || window.location.port === '4173' || window.location.port === '4174' ? '8002' : window.location.port) : '8002';
-  const datasetUrl = `http://127.0.0.1:${backendPort}/api/jobs/default/surface.vtp`;
-
-  return () => window.removeEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const handleRotation = (axis: 'x' | 'y' | 'z', v: number) => {
@@ -77,15 +83,7 @@ export default function App() {
     else if (axis === 'y') setRotationY(v);
     else setRotationZ(v);
   };
-
-  const resetRotation = () => {
-    setRotationX(0);
-    setRotationY(0);
-    setRotationZ(0);
-  };
-
-  const backendPort = typeof window !== 'undefined' ? (window.location.port === '5173' || window.location.port === '4173' || window.location.port === '4174' ? '8002' : window.location.port) : '8002';
-  const datasetUrl = `http://127.0.0.1:${backendPort}/api/jobs/default/surface.vtp`;
+  const resetRotation = () => { setRotationX(0); setRotationY(0); setRotationZ(0); };
 
   return (
     <div className="app-shell">
@@ -116,11 +114,7 @@ export default function App() {
           onCadRetry={cad.probe}
         />
         {sidebarOpen && (
-          <div
-            className="sidebar-backdrop"
-            onClick={() => setSidebarOpen(false)}
-            aria-hidden="true"
-          />
+          <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
         )}
         <main className="app-main">
           <div className="backend-badge-wrapper">
@@ -138,10 +132,14 @@ export default function App() {
             rotationY={rotationY}
             rotationZ={rotationZ}
           />
-          <CfdLab
-            backendOnline={backend.status === "online"}
-            datasetUrl={datasetUrl}
-          />
+          {backend.mode === 'cfd' && (
+            <Suspense fallback={<CfdLabSkeleton />}>
+              <CfdLab
+                backendUrl={backend.backendOrigin}
+                solverAvailable={backend.solverAvailable}
+              />
+            </Suspense>
+          )}
           <ReadmeSection />
           <ProjectShowcase />
           <footer className="footer">
