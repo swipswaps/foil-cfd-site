@@ -1,18 +1,22 @@
 import { Component, type ReactNode } from 'react';
 
 interface Props { children: ReactNode }
-interface State { error: Error | null }
+interface State { error: Error | null; retryKey: number }
 
 export class CfdVtkBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, retryKey: 0 };
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
   }
 
   componentDidCatch(error: Error) {
     console.error('CfdVtkBoundary caught:', error);
   }
+
+  handleRetry = () => {
+    this.setState((s) => ({ error: null, retryKey: s.retryKey + 1 }));
+  };
 
   render() {
     if (this.state.error) {
@@ -22,13 +26,12 @@ export class CfdVtkBoundary extends Component<Props, State> {
             <div className="cfd-vtk-fallback-title">3D scientific viewer unavailable</div>
             <div className="cfd-vtk-fallback-msg">{this.state.error.message}</div>
             <p className="cfd-vtk-fallback-hint">
-              The rest of the site is fine. This is usually a WebGL context limit
-              or GPU driver issue. Try closing other 3D tabs.
+              Usually a WebGL context limit. Close other 3D tabs, then retry.
             </p>
             <button
               type="button"
               className="cfd-vtk-fallback-btn"
-              onClick={() => this.setState({ error: null })}
+              onClick={this.handleRetry}
             >
               Retry viewer
             </button>
@@ -36,6 +39,6 @@ export class CfdVtkBoundary extends Component<Props, State> {
         </section>
       );
     }
-    return this.props.children;
+    return <div key={this.state.retryKey}>{this.props.children}</div>;
   }
 }

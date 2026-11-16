@@ -33,7 +33,13 @@ export function FoilScene({
   return (
     <Canvas
       camera={{ position: [0, 1.5, 5], fov: 45 }}
-      gl={{ antialias: true, alpha: false }}
+      gl={{
+        antialias: true,
+        alpha: false,
+        powerPreference: 'high-performance',
+        failIfMajorPerformanceCaveat: false,
+      }}
+      dpr={[1, 1.5]}
       onCreated={({ gl }) => { gl.setClearColor('#0B2545', 1); }}
     >
       <color attach="background" args={['#0B2545']} />
@@ -50,7 +56,7 @@ export function FoilScene({
 
         {flow && (
           <FlowParticles
-            key={`flow-${content.token}-${rotationX}-${rotationY}-${rotationZ}`}
+            key={`flow-${content.token}`}
             mode={content.kind === 'model' ? 'volume' : 'planar'}
             count={content.kind === 'model' ? 3500 : 2500}
             flowSphere={content.kind === 'model' ? content.sphere : undefined}

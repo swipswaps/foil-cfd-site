@@ -1049,3 +1049,80 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   color: #5E8FA8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+
+/* =========================================================================
+   HERO CANVAS FALLBACK
+   ========================================================================= */
+.canvas-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+  background: linear-gradient(135deg, #0B2545 0%, #06121A 100%);
+}
+.canvas-fallback-body {
+  text-align: center;
+  max-width: 480px;
+}
+.canvas-fallback-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #F87171;
+  margin-bottom: 0.5rem;
+}
+.canvas-fallback-msg {
+  font-size: 0.75rem;
+  color: #FCA5A5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: rgba(127, 29, 29, 0.25);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  word-break: break-word;
+}
+.canvas-fallback-hints {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  text-align: left;
+  font-size: 0.72rem;
+  color: #94AEBF;
+  line-height: 1.6;
+}
+.canvas-fallback-hints li {
+  padding-left: 1rem;
+  position: relative;
+}
+.canvas-fallback-hints li::before {
+  content: '›';
+  position: absolute;
+  left: 0;
+  color: #5BC0EB;
+}
+.canvas-fallback-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.canvas-fallback-btn {
+  background: #132A38;
+  color: #7FB6D4;
+  border: 1px solid #1E3A4A;
+  border-radius: 6px;
+  padding: 0.45rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.canvas-fallback-btn:hover {
+  background: #1A3A4E;
+  border-color: #5BC0EB;
+  color: #A6D9F0;
+}
+.canvas-fallback-btn-ghost {
+  background: transparent;
+}

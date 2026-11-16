@@ -1,51 +1,64 @@
 import { Component, type ReactNode } from 'react';
 
 interface Props { children: ReactNode; fallback?: ReactNode }
-interface State { error: Error | null }
+interface State { error: Error | null; retryKey: number }
 
 export class CanvasBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, retryKey: 0 };
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
   }
 
   componentDidCatch(error: Error) {
-    // eslint-disable-next-line no-console
     console.error('CanvasBoundary caught:', error);
   }
 
+  handleRetry = () => {
+    this.setState((s) => ({ error: null, retryKey: s.retryKey + 1 }));
+  };
+
+  handleReload = () => {
+    if (typeof window !== 'undefined') window.location.reload();
+  };
+
   render() {
     if (this.state.error) {
+      if (this.props.fallback) return this.props.fallback;
+      const msg = this.state.error.message || '';
+      const isWebGL = /webgl/i.test(msg);
       return (
-        this.props.fallback ?? (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: '#0B2545',
-              color: '#94C9E8',
-              padding: '2rem',
-              textAlign: 'center',
-              fontFamily: 'system-ui, sans-serif',
-              fontSize: '0.85rem',
-            }}
-          >
-            <div>
-              <div style={{ color: '#F87171', fontWeight: 600, marginBottom: '0.5rem' }}>
-                3D scene failed to load
-              </div>
-              <div style={{ color: '#5E8FA8', fontSize: '0.75rem' }}>
-                {this.state.error.message}
-              </div>
+        <div className="canvas-fallback">
+          <div className="canvas-fallback-body">
+            <div className="canvas-fallback-title">3D scene unavailable</div>
+            <div className="canvas-fallback-msg">{msg}</div>
+            {isWebGL && (
+              <ul className="canvas-fallback-hints">
+                <li>Close other browser tabs with 3D content</li>
+                <li>Check that hardware acceleration is on (chrome://gpu)</li>
+                <li>On Linux, verify GPU drivers are installed</li>
+              </ul>
+            )}
+            <div className="canvas-fallback-actions">
+              <button
+                type="button"
+                className="canvas-fallback-btn"
+                onClick={this.handleRetry}
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                className="canvas-fallback-btn canvas-fallback-btn-ghost"
+                onClick={this.handleReload}
+              >
+                Reload page
+              </button>
             </div>
           </div>
-        )
+        </div>
       );
     }
-    return this.props.children;
+    return <div key={this.state.retryKey} style={{ width: '100%', height: '100%' }}>{this.props.children}</div>;
   }
 }

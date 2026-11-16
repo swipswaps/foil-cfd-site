@@ -53,15 +53,21 @@ export default function App() {
   const [rotationY, setRotationY] = useState(0);
   const [rotationZ, setRotationZ] = useState(0);
 
-  // ---- CFD tool state (single source of truth) ----
   const [cfdField, setCfdField] = useState<CfdField>('p');
   const [cfdJobId, setCfdJobId] = useState<string | null>(null);
   const [cfdJobStatus, setCfdJobStatus] = useState<string>('idle');
   const [cfdError, setCfdError] = useState<string | null>(null);
-  const [cfdDatasetUrl, setCfdDatasetUrl] = useState<string | null>(null);
+  const [cfdJobDatasetUrl, setCfdJobDatasetUrl] = useState<string | null>(null);
 
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
+
+  // Derived — never null when backend online. No effect needed.
+  const datasetUrl =
+    cfdJobDatasetUrl ??
+    (backend.backendOrigin
+      ? `${backend.backendOrigin}/api/jobs/default/surface.vtp`
+      : null);
 
   useEffect(() => {
     const update = () => setDetectedDevice(detectDevice());
@@ -87,13 +93,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Default dataset URL once backend is online
-  useEffect(() => {
-    if (backend.mode === 'cfd' && backend.backendOrigin && !cfdDatasetUrl) {
-      setCfdDatasetUrl(`${backend.backendOrigin}/api/jobs/default/surface.vtp`);
-    }
-  }, [backend.mode, backend.backendOrigin, cfdDatasetUrl]);
-
   // Poll active job
   useEffect(() => {
     if (!cfdJobId || !backend.backendOrigin) return;
@@ -106,7 +105,7 @@ export default function App() {
         if (cancelled) return;
         setCfdJobStatus(data.status);
         if (data.status === 'completed') {
-          setCfdDatasetUrl(`${backend.backendOrigin}/api/jobs/${cfdJobId}/surface.vtp`);
+          setCfdJobDatasetUrl(`${backend.backendOrigin}/api/jobs/${cfdJobId}/surface.vtp`);
         } else if (data.status !== 'failed') {
           setTimeout(poll, 1500);
         }
@@ -144,6 +143,8 @@ export default function App() {
     else setRotationZ(v);
   };
   const resetRotation = () => { setRotationX(0); setRotationY(0); setRotationZ(0); };
+
+  const backendOnline = backend.status === 'online' && !!backend.backendOrigin;
 
   return (
     <div className="app-shell">
@@ -202,13 +203,13 @@ export default function App() {
             rotationY={rotationY}
             rotationZ={rotationZ}
           />
-          {backend.mode === 'cfd' && cfdDatasetUrl && backend.backendOrigin && (
+          {backendOnline && datasetUrl && (
             <Suspense fallback={<CfdLabSkeleton />}>
               <CfdLab
                 backendUrl={backend.backendOrigin}
                 solverAvailable={backend.solverAvailable}
                 field={cfdField}
-                datasetUrl={cfdDatasetUrl}
+                datasetUrl={datasetUrl}
                 jobId={cfdJobId}
                 jobStatus={cfdJobStatus}
               />
