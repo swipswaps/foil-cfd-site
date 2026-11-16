@@ -1,11 +1,14 @@
 FoamFile { version 2.0; format ascii; class dictionary; object blockMeshDict; }
+// NOTE: this is a rectangular channel placeholder mesh.
+// simpleFoam will solve uniform channel flow, not flow over an airfoil.
+// Replace with an actual snappyHexMesh + NACA0012 STL for real results.
 convertToMeters 1;
 vertices (
     (-2 -2 -0.1) ( 4 -2 -0.1) ( 4  2 -0.1) (-2  2 -0.1)
     (-2 -2  0.1) ( 4 -2  0.1) ( 4  2  0.1) (-2  2  0.1)
 );
 blocks (
-    hex (0 1 2 3 4 5 6 7) (80 40 1) simpleGrading (1 1 1)
+    hex (0 1 2 3 4 5 6 7) (80 40 1) simpleGrading (1 1 1);
 );
 edges ();
 boundary (

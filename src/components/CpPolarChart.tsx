@@ -1,7 +1,11 @@
-import createPlotlyComponent from 'react-plotly.js/factory';
+import createPlotlyComponentImport from 'react-plotly.js/factory';
 import Plotly from 'plotly.js-dist-min';
 
-const Plot = createPlotlyComponent(Plotly as never);
+const factory =
+  (createPlotlyComponentImport as unknown as { default?: typeof createPlotlyComponentImport })
+    .default ?? createPlotlyComponentImport;
+
+const Plot = (factory as (p: unknown) => React.ComponentType<Record<string, unknown>>)(Plotly);
 
 export interface CpPoint { x: number; cp: number }
 

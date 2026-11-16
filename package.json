@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@kitware/vtk.js": "^38.0.11",
+    "@kitware/vtk.js": "^27.4.4",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "plotly.js": "^4.3.0",

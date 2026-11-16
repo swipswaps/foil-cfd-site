@@ -5,36 +5,36 @@ import numpy as np
 import pyvista as pv
 
 
+def _airfoil_polyline(points: np.ndarray) -> pv.PolyData:
+    """Build a PolyData with a single closed PolyLine cell (VTK convention)."""
+    n = len(points)
+    cell = np.insert(np.arange(n, dtype=np.int_), 0, n)
+    cell = np.append(cell, 0)  # close the loop
+    cell[0] = n + 1            # leading count includes the extra closing point
+    poly = pv.PolyData()
+    poly.points = points
+    poly.lines = cell
+    return poly
+
+
 def ensure_default_surface(output_path: Path) -> Path:
     if output_path.exists():
         return output_path
-
     n = 80
     beta = np.linspace(0.0, np.pi, n)
     xc = (1.0 - np.cos(beta)) / 2.0
     yt = 5.0 * 0.12 * (
-        0.2969 * np.sqrt(xc)
-        - 0.1260 * xc
-        - 0.3516 * xc ** 2
-        + 0.2843 * xc ** 3
-        - 0.1015 * xc ** 4
+        0.2969 * np.sqrt(xc) - 0.1260 * xc
+        - 0.3516 * xc ** 2 + 0.2843 * xc ** 3 - 0.1015 * xc ** 4
     )
-
     upper = np.column_stack([xc, yt, np.zeros_like(xc)])
     lower = np.column_stack([xc[::-1], -yt[::-1], np.zeros_like(xc)])
     pts = np.vstack([upper, lower])
+    poly = _airfoil_polyline(pts)
 
-    # Closed loop: upper 0..n-1, lower n..2n-1, back to 0
-    n_pts = len(pts)
-    loop = np.concatenate([np.arange(n_pts), [0]])
-    poly = pv.PolyData(pts, lines=loop)
-
-    # Cp: peak suction near leading edge, recovery to trailing edge
     cp_upper = 1.0 - 3.0 * np.sin(np.pi * xc) ** 1.4
     cp_lower = 1.0 - 0.8 * np.sin(np.pi * xc) ** 1.4
     cp = np.concatenate([cp_upper, cp_lower[::-1]])
-
-    # U: chordwise flow with magnitude driven by Cp (Bernoulli)
     u_mag = np.sqrt(np.maximum(1.0 - cp, 0.0))
     poly.point_data["p"] = cp.astype(np.float32)
     poly.point_data["U"] = np.column_stack([

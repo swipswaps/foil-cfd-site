@@ -1,13 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
+
+// Force WebGL backend on VTK.js — Chrome's navigator.gpu returns null from
+// requestAdapter(), which VTK.js 16.14+ mis-handles as a null context.
+if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
+  try {
+    Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
+  } catch {
+    /* read-only in some engines; pinning vtk.js still keeps WebGL default */
+  }
+}
+
 import '@kitware/vtk.js/Rendering/Profiles/Geometry';
+import '@kitware/vtk.js/Rendering/Profiles/Volume';
 import vtkGenericRenderWindow from '@kitware/vtk.js/Rendering/Misc/GenericRenderWindow';
 import vtkXMLPolyDataReader from '@kitware/vtk.js/IO/XML/XMLPolyDataReader';
 import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
 
-interface Props {
-  datasetUrl: string;
-}
+interface Props { datasetUrl: string }
 
 interface VtkRefs {
   view: ReturnType<typeof vtkGenericRenderWindow.newInstance>;
@@ -24,10 +34,6 @@ export function CfdVtkViewer({ datasetUrl }: Props) {
   const [status, setStatus] = useState('Waiting for layout…');
   const [field, setField] = useState('p');
 
-  // -------------------------------------------------------------------------
-  // Effect 1: initialise VTK once. Defers until the container has real
-  // dimensions; guards WebGL2 availability; every VTK call in try/catch.
-  // -------------------------------------------------------------------------
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -36,56 +42,33 @@ export function CfdVtkViewer({ datasetUrl }: Props) {
 
     const tryInit = () => {
       if (cancelled || initFailedRef.current || vtkRef.current) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      if (w === 0 || h === 0) {
+      if (container.clientWidth === 0 || container.clientHeight === 0) {
         raf = requestAnimationFrame(tryInit);
         return;
       }
       try {
-        const probe = document.createElement('canvas');
-        const gl = probe.getContext('webgl2');
-        if (!gl) {
-          initFailedRef.current = true;
-          setStatus('WebGL2 not available in this browser');
-          return;
-        }
-
-        const view = vtkGenericRenderWindow.newInstance({
-          background: [0.043, 0.071, 0.102],
-        });
+        const view = vtkGenericRenderWindow.newInstance({ background: [0.043, 0.071, 0.102] });
         view.setContainer(container);
         view.resize();
-
         const reader = vtkXMLPolyDataReader.newInstance();
         const mapper = vtkMapper.newInstance();
         const actor = vtkActor.newInstance();
         mapper.setInputConnection(reader.getOutputPort());
         actor.setMapper(mapper);
         view.getRenderer().addActor(actor);
-
         const ro = new ResizeObserver(() => {
           const cur = vtkRef.current;
           if (!cur) return;
-          try {
-            cur.view.resize();
-            cur.view.getRenderWindow().render();
-          } catch {
-            /* ignore transient resize failures */
-          }
+          try { cur.view.resize(); cur.view.getRenderWindow().render(); } catch { /* noop */ }
         });
         ro.observe(container);
-
         vtkRef.current = { view, reader, mapper, actor, ro };
         setStatus('Ready — loading dataset…');
       } catch (err) {
         initFailedRef.current = true;
-        setStatus(
-          err instanceof Error ? `VTK init: ${err.message}` : 'VTK init failed'
-        );
+        setStatus(err instanceof Error ? `VTK init: ${err.message}` : 'VTK init failed');
       }
     };
-
     raf = requestAnimationFrame(tryInit);
 
     return () => {
@@ -103,24 +86,17 @@ export function CfdVtkViewer({ datasetUrl }: Props) {
     };
   }, []);
 
-  // -------------------------------------------------------------------------
-  // Effect 2: load / reload dataset when URL or field changes. Reuses the
-  // existing VTK instance — no new WebGL context per toggle.
-  // -------------------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
-
     const load = async () => {
-      // Wait until VTK is initialised (Effect 1 does it async)
       let waited = 0;
-      while (!cancelled && !vtkRef.current && !initFailedRef.current && waited < 100) {
+      while (!cancelled && !vtkRef.current && !initFailedRef.current && waited < 120) {
         await new Promise((r) => requestAnimationFrame(r));
         waited++;
       }
       if (cancelled || initFailedRef.current) return;
       const vtk = vtkRef.current;
       if (!vtk) return;
-
       try {
         const res = await fetch(datasetUrl, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -129,7 +105,6 @@ export function CfdVtkViewer({ datasetUrl }: Props) {
         vtk.reader.parseAsArrayBuffer(buf);
         const data = vtk.reader.getOutputData(0);
         if (!data) throw new Error('VTK dataset empty');
-
         const names = data.getPointData().getArrays().map((a) => a.getName());
         if (names.includes(field)) {
           vtk.mapper.setScalarVisibility(true);
@@ -142,11 +117,9 @@ export function CfdVtkViewer({ datasetUrl }: Props) {
         vtk.view.getRenderWindow().render();
         setStatus(`${data.getNumberOfPoints()} pts · ${data.getNumberOfCells()} cells`);
       } catch (err) {
-        if (cancelled) return;
-        setStatus(err instanceof Error ? err.message : 'Load failed');
+        if (!cancelled) setStatus(err instanceof Error ? err.message : 'Load failed');
       }
     };
-
     load();
     return () => { cancelled = true; };
   }, [datasetUrl, field]);
