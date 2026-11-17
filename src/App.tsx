@@ -19,8 +19,14 @@ const CfdLab = lazy(() =>
 function detectDevice(): DetectedDevice {
   if (typeof window === 'undefined') return 'desktop';
   const w = window.innerWidth;
-  if (w < 600) return 'phone';
-  if (w < 1024) return 'tablet';
+  const coarse =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+  const touchPoints = typeof navigator !== 'undefined' ? navigator.maxTouchPoints || 0 : 0;
+  const isTouchDevice = coarse || touchPoints > 0;
+
+  if (w < 640) return 'phone';
+  if (isTouchDevice && w < 1100) return 'tablet';
   return 'desktop';
 }
 

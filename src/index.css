@@ -1126,3 +1126,36 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
 .canvas-fallback-btn-ghost {
   background: transparent;
 }
+
+
+/* FOIL_V30_PHONE_SLIDER_FIX */
+.rot-slider,
+.speed-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.5rem;
+}
+
+.rot-slider label,
+.speed-row label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rot-slider span,
+.speed-row .speed-value {
+  flex: 0 0 auto;
+  text-align: right;
+  min-width: 2.75rem;
+}
+
+.rot-slider input[type="range"],
+.speed-row input[type="range"] {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+  margin: 0.1rem 0 0.35rem;
+  touch-action: pan-y;
+}
