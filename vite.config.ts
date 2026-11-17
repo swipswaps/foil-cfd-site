@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
 
 export default defineConfig({
   base: '/foil-cfd-site/',
@@ -7,6 +8,10 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 800,
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        hydro: resolve(__dirname, 'hydro.html'),
+      },
       output: {
         manualChunks(id: string) {
           if (id.includes('node_modules/three/')) return 'three-vendor';
