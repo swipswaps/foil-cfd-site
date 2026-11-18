@@ -1,5 +1,11 @@
 import createPlotlyComponentImport from 'react-plotly.js/factory';
-import Plotly from 'plotly.js-dist-min';
+import Plotly from 'plotly.js/lib/core';
+import * as scatterTrace from 'plotly.js/lib/scatter';
+
+const scatterModule =
+  (scatterTrace as unknown as { default?: unknown }).default ?? scatterTrace;
+
+Plotly.register([scatterModule] as unknown as Parameters<typeof Plotly.register>[0]);
 
 const factory =
   (createPlotlyComponentImport as unknown as { default?: typeof createPlotlyComponentImport })
