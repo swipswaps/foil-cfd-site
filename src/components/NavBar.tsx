@@ -1,13 +1,3 @@
-import type { CSSProperties } from 'react';
-
-const navLink: CSSProperties = {
-  color: '#94AEBF',
-  textDecoration: 'none',
-  fontSize: '0.85rem',
-  fontWeight: 500,
-  letterSpacing: '0.02em',
-};
-
 interface Props {
   onToggleSidebar: () => void;
   sidebarOpen: boolean;

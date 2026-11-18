@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import * as THREE from 'three';
 import { NACA_PRESETS } from '../data/naca';
-import type { SceneContent } from '../data/scene';
+import type { FlowSphere, SceneContent } from '../data/scene';
 
 interface Props {
   content: SceneContent;
@@ -51,7 +51,7 @@ function disposeObject(obj: THREE.Object3D) {
 
 async function loadModelFile(file: File): Promise<{
   object: THREE.Object3D;
-  sphere: { center: THREE.Vector3; radius: number };
+  sphere: FlowSphere;
 }> {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   const factory = LOADERS[ext];

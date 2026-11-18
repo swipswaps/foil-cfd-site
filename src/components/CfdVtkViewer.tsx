@@ -103,7 +103,7 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
         vtk.reader.parseAsArrayBuffer(buf);
         const data = vtk.reader.getOutputData(0);
         if (!data) throw new Error('VTK dataset empty');
-        const names = data.getPointData().getArrays().map((a) => a.getName());
+        const names = data.getPointData().getArrays().map((a: { getName: () => string }) => a.getName());
         if (names.includes(field)) {
           vtk.mapper.setScalarVisibility(true);
           vtk.mapper.setColorByArrayName(field);

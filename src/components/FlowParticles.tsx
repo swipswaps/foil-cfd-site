@@ -160,7 +160,7 @@ export function FlowParticles({
         } else {
           // Airfoil (object at origin)
           p.set(wx, wy, wz).applyQuaternion(qInv);
-          const lx = p.x, ly = p.y, lz = p.z;
+          const lx = p.x, ly = p.y;
 
           let ux = windLocal.x, uy = windLocal.y, uz = windLocal.z;
 
@@ -237,9 +237,7 @@ export function FlowParticles({
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
-          count={initial.length / 3}
-          array={initial}
-          itemSize={3}
+          args={[initial, 3]}
         />
       </bufferGeometry>
       <pointsMaterial size={0.035} color="#FFFFFF" transparent opacity={0.85} />
