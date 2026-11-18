@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700"
      role="img" aria-labelledby="t d">
   <title id="t">FOIL.CFD</title>
-  <desc id="d">NACA 16-series airfoil with computational mesh and streamlines outside the wing.</desc>
+  <desc id="d">NACA 16-series airfoil with computational mesh and streamlines outside the wing; lowercase foil above and .cfd below.</desc>
   <defs>
     <path id="f"
       d="M250,350
@@ -47,11 +47,16 @@
     </g>
   </g>
   <use href="#f" fill="#7DD3FC" stroke="#5BC0EB" stroke-width="4" stroke-linejoin="round"/>
-  <text x="500" y="560" text-anchor="middle"
-        font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif"
-        font-size="76" font-weight="400" letter-spacing="0"
-        fill="#E2F4FF" paint-order="stroke" stroke="#06121A"
-        stroke-width="8" stroke-linejoin="round">
-    FOIL<tspan fill="#5BC0EB">.CFD</tspan>
+  <text x="500" y="292" text-anchor="middle"
+        font-family="'Arial Narrow', Impact, 'Helvetica Neue', sans-serif"
+        font-size="56" font-weight="700" letter-spacing="2"
+        fill="#E2F4FF" paint-order="stroke" stroke="#06121A" stroke-width="8" stroke-linejoin="round">
+    foil
+  </text>
+  <text x="500" y="512" text-anchor="middle"
+        font-family="'Arial Narrow', Impact, 'Helvetica Neue', sans-serif"
+        font-size="56" font-weight="700" letter-spacing="2"
+        fill="#5BC0EB" paint-order="stroke" stroke="#06121A" stroke-width="8" stroke-linejoin="round">
+    .cfd
   </text>
 </svg>
