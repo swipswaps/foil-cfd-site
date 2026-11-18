@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { FlowSphere } from '../data/scene';
@@ -13,6 +13,11 @@ interface Props {
 }
 
 const IDENTITY = new THREE.Quaternion();
+
+function pseudo(i: number, salt: number): number {
+  const x = Math.sin(i * 12.9898 + salt) * 43758.5453;
+  return x - Math.floor(x);
+}
 
 export function FlowParticles({
   flowSphere,
@@ -29,20 +34,20 @@ export function FlowParticles({
     const zMin = mode === 'volume' ? -2 : 0.9;
     const zSpan = mode === 'volume' ? 4 : 0.2;
     for (let i = 0; i < count; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * 10;
-      arr[i * 3 + 1] = (Math.random() - 0.5) * 4;
-      arr[i * 3 + 2] = zMin + Math.random() * zSpan;
+      arr[i * 3] = (pseudo(i, 1.0) - 0.5) * 10;
+      arr[i * 3 + 1] = (pseudo(i, 2.0) - 0.5) * 4;
+      arr[i * 3 + 2] = zMin + pseudo(i, 3.0) * zSpan;
     }
     return arr;
   }, [count, mode]);
 
   // World-Y lane each particle started on.
   const laneYRef = useRef<Float32Array | null>(null);
-  if (!laneYRef.current || laneYRef.current.length !== count) {
+  useEffect(() => {
     const lanes = new Float32Array(count);
     for (let i = 0; i < count; i++) lanes[i] = initial[i * 3 + 1];
     laneYRef.current = lanes;
-  }
+  }, [count, initial]);
 
   // World centre + half-extents of the body (from content.sphere, world coords).
   const body = useMemo(() => {

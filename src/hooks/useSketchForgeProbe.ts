@@ -26,13 +26,23 @@ export function useSketchForgeProbe() {
   const [status, setStatus] = useState<SketchForgeStatus>('probing');
   const [url] = useState(EDITOR_URL);
 
-  const run = useCallback(async () => {
-    setStatus('probing');
+  const runProbe = useCallback(async (): Promise<SketchForgeStatus> => {
     const ok = await probe();
-    setStatus(ok ? 'online' : 'offline');
+    return ok ? 'online' : 'offline';
   }, []);
 
-  useEffect(() => { run(); }, [run]);
+  const run = useCallback(async () => {
+    setStatus('probing');
+    setStatus(await runProbe());
+  }, [runProbe]);
+
+  useEffect(() => {
+    let active = true;
+    runProbe().then((next) => {
+      if (active) setStatus(next);
+    });
+    return () => { active = false; };
+  }, [runProbe]);
 
   return { status, url, probe: run };
 }

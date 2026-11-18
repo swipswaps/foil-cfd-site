@@ -12,7 +12,7 @@ function renderPlainText(text: string): ReactNode {
 
     if (
       i + 1 < lines.length &&
-      /^[=\-]{3,}\s*$/.test(lines[i + 1]) &&
+      /^[=-]{3,}\s*$/.test(lines[i + 1]) &&
       line.trim() !== ''
     ) {
       const isH2 = line.trim() === line.trim().toUpperCase();
@@ -50,7 +50,7 @@ function renderPlainText(text: string): ReactNode {
       i < lines.length &&
       lines[i].trim() !== '' &&
       !/^( {4,}|\t)/.test(lines[i]) &&
-      !(i + 1 < lines.length && /^[=\-]{3,}\s*$/.test(lines[i + 1]))
+      !(i + 1 < lines.length && /^[=-]{3,}\s*$/.test(lines[i + 1]))
     ) {
       para.push(lines[i]);
       i += 1;
