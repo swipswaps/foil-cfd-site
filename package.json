@@ -8,14 +8,14 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@kitware/vtk.js": "^27.4.4",
+    "@kitware/vtk.js": "^38.1.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "plotly.js": "^4.3.0",
-    "plotly.js-dist-min": "^4.3.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-plotly.js": "^4.1.0",
