@@ -134,13 +134,13 @@ export function Sidebar({
               onClick={onCfdSolve}
               disabled={solving}
               className="upload-btn upload-btn-full"
-              title={solverAvailable ? 'Run simpleFoam on NACA0012 case' : 'Run synthetic NACA0012 solver pipeline'}
+              title={solverAvailable ? 'Run simpleFoam on NACA0012 case' : 'Generate a synthetic NACA0012 preview; no CFD solver is run'}
             >
               {solving
                 ? (cfdJobStatus === 'submitting' ? 'Submitting…' : 'Solving…')
                 : solverAvailable
                 ? 'Run simpleFoam'
-                : 'Run solver (synthetic)'}
+                : 'Generate synthetic preview'}
             </button>
 
             {cfdJobId && cfdJobStatus !== 'idle' && (

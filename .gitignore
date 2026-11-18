@@ -26,3 +26,7 @@ dist-ssr
 /react
 /dist
 node_modules
+/backend/jobs
+/.repair-backups
+/test-results
+/playwright-report

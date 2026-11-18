@@ -1,8 +1,9 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { useBackendProbe } from './hooks/useBackendProbe';
 
 interface HydroParams {
   speedKnots: number;
@@ -172,16 +173,7 @@ function CpCavitationChart({ stations, sigma, cavitating }: { stations: any[]; s
 
 function HydroApp() {
   const [params, setParams] = useState<HydroParams>({ speedKnots: 22, aoaDeg: 4.5, depthMeters: 0.65, spanMeters: 0.92, chordMeters: 0.14, waterTempC: 18 });
-  const [backendStatus, setBackendStatus] = useState<'probing' | 'online' | 'offline'>('probing');
-
-  useEffect(() => {
-    let active = true;
-    fetch('http://127.0.0.1:8002/api/health')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (active) setBackendStatus(d && d.status === 'online' ? 'online' : 'offline'); })
-      .catch(() => { if (active) setBackendStatus('offline'); });
-    return () => { active = false; };
-  }, []);
+  const backend = useBackendProbe();
 
   const m = useMemo(() => computeHydroMetrics(params), [params]);
 
@@ -194,9 +186,18 @@ function HydroApp() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.85rem' }}>
           <a href="./index.html" style={{ color: '#93C5FD', textDecoration: 'none' }}>← Core FOIL.CFD Hub</a>
-          <span style={{ padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.78rem', background: backendStatus === 'online' ? 'rgba(16,185,129,0.16)' : 'rgba(148,163,184,0.14)', color: backendStatus === 'online' ? '#34D399' : '#94A3B8', border: `1px solid ${backendStatus === 'online' ? '#059669' : '#334155'}` }}>
-            {backendStatus === 'online' ? 'Local OpenFOAM/VTK Node Online (:8002)' : 'Static Cavitation Preview Mode'}
-          </span>
+          <button
+            type="button"
+            onClick={backend.probe}
+            title={backend.status === 'offline' ? backend.reason : undefined}
+            style={{ padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.78rem', font: 'inherit', cursor: backend.status === 'online' ? 'default' : 'pointer', background: backend.status === 'online' ? 'rgba(16,185,129,0.16)' : 'rgba(148,163,184,0.14)', color: backend.status === 'online' ? '#34D399' : '#94A3B8', border: `1px solid ${backend.status === 'online' ? '#059669' : '#334155'}` }}
+          >
+            {backend.status === 'online'
+              ? `Local OpenFOAM/VTK Node Online (${backend.backendOrigin.replace(/^https?:\/\//, '')})`
+              : backend.status === 'probing'
+              ? 'Detecting local solver…'
+              : 'Static Cavitation Preview Mode'}
+          </button>
         </div>
       </header>
       <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
