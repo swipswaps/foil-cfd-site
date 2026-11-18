@@ -23,7 +23,8 @@ echo "============================================"
 echo ""
 
 echo "[1] Health"
-H_CODE=$(curl -s -m 3 -o /tmp/foil-health.json -w "%{http_code}" "$BASE/api/health" || echo "000")
+H_CODE=$(curl -s -m 5 -o /tmp/foil-health.json -w "%{http_code}" "$BASE/api/health")
+[ -n "$H_CODE" ] || H_CODE=000
 if [ "$H_CODE" = "200" ]; then
   check "GET /api/health → 200" 1
   H_ST=$(python3 -c "import json;print(json.load(open('/tmp/foil-health.json')).get('status',''))" 2>/dev/null || echo "")
@@ -39,7 +40,13 @@ fi
 echo ""
 
 echo "[2] Default VTP dataset"
-V_CODE=$(curl -s -m 5 -o /tmp/foil-default.vtp -w "%{http_code}" "$BASE/api/jobs/default/surface.vtp" || echo "000")
+V_CODE=$(curl -s -m 30 -o /tmp/foil-default.vtp -w "%{http_code}" "$BASE/api/jobs/default/surface.vtp")
+[ -n "$V_CODE" ] || V_CODE=000
+if [ "$V_CODE" = "000" ]; then
+  sleep 3
+  V_CODE=$(curl -s -m 30 -o /tmp/foil-default.vtp -w "%{http_code}" "$BASE/api/jobs/default/surface.vtp")
+  [ -n "$V_CODE" ] || V_CODE=000
+fi
 if [ "$V_CODE" = "200" ]; then
   check "GET /api/jobs/default/surface.vtp → 200" 1
   V_SIZE=$(stat -c%s /tmp/foil-default.vtp 2>/dev/null || stat -f%z /tmp/foil-default.vtp 2>/dev/null || echo 0)
@@ -53,7 +60,8 @@ echo ""
 echo "[3] POST /api/solve"
 S_CODE=$(curl -s -m 15 -X POST -H "Content-Type: application/json" \
   -d '{"case_id":"naca0012"}' \
-  -o /tmp/foil-solve.json -w "%{http_code}" "$BASE/api/solve" || echo "000")
+  -o /tmp/foil-solve.json -w "%{http_code}" "$BASE/api/solve")
+[ -n "$S_CODE" ] || S_CODE=000
 JOB_ID=""
 if [ "$S_CODE" = "200" ]; then
   check "POST /api/solve → 200" 1
@@ -69,7 +77,7 @@ if [ -n "$JOB_ID" ]; then
   sleep 2
   J_ST=""
   for i in $(seq 1 20); do
-    curl -s -m 3 "$BASE/api/jobs/$JOB_ID" -o /tmp/foil-job.json
+    curl -s -m 5 "$BASE/api/jobs/$JOB_ID" -o /tmp/foil-job.json
     J_ST=$(python3 -c "import json;print(json.load(open('/tmp/foil-job.json')).get('status',''))" 2>/dev/null || echo "")
     [ "$J_ST" = "completed" ] && break
     [ "$J_ST" = "failed" ] && break
@@ -81,7 +89,8 @@ if [ -n "$JOB_ID" ]; then
 
   if [ "$J_ST" = "completed" ]; then
     echo "[5] Analysis /api/jobs/$JOB_ID/analysis"
-    A_CODE=$(curl -s -m 5 -o /tmp/foil-analysis.json -w "%{http_code}" "$BASE/api/jobs/$JOB_ID/analysis" || echo "000")
+    A_CODE=$(curl -s -m 30 -o /tmp/foil-analysis.json -w "%{http_code}" "$BASE/api/jobs/$JOB_ID/analysis")
+    [ -n "$A_CODE" ] || A_CODE=000
     if [ "$A_CODE" = "200" ]; then
       check "GET /analysis → 200" 1
       N_PTS=$(python3 -c "import json;print(json.load(open('/tmp/foil-analysis.json')).get('n_points',0))" 2>/dev/null || echo 0)
@@ -92,7 +101,8 @@ if [ -n "$JOB_ID" ]; then
     echo ""
 
     echo "[6] Job surface /api/jobs/$JOB_ID/surface.vtp"
-    JV_CODE=$(curl -s -m 5 -o /tmp/foil-job.vtp -w "%{http_code}" "$BASE/api/jobs/$JOB_ID/surface.vtp" || echo "000")
+    JV_CODE=$(curl -s -m 30 -o /tmp/foil-job.vtp -w "%{http_code}" "$BASE/api/jobs/$JOB_ID/surface.vtp")
+    [ -n "$JV_CODE" ] || JV_CODE=000
     if [ "$JV_CODE" = "200" ]; then
       check "GET /surface.vtp → 200" 1
       grep -q 'VTKFile' /tmp/foil-job.vtp && check "  VTK XML header" 1 || check "  VTK XML header" 0
@@ -104,16 +114,18 @@ if [ -n "$JOB_ID" ]; then
 fi
 
 echo "[7] CORS preflight from GitHub Pages"
-CORS_CODE=$(curl -s -m 3 -o /dev/null -X OPTIONS \
+CORS_CODE=$(curl -s -m 5 -o /dev/null -X OPTIONS \
   -H "Origin: https://swipswaps.github.io" \
   -H "Access-Control-Request-Method: POST" \
   -H "Access-Control-Request-Headers: content-type" \
-  -w "%{http_code}" "$BASE/api/solve" || echo "000")
+  -w "%{http_code}" "$BASE/api/solve")
+[ -n "$CORS_CODE" ] || CORS_CODE=000
 check "OPTIONS /api/solve → 200" "$([ "$CORS_CODE" = "200" ] && echo 1 || echo 0)" "HTTP $CORS_CODE"
 echo ""
 
 echo "[8] SketchForge-3D (port 8090, optional)"
-SF_CODE=$(curl -s -m 2 -o /dev/null -w "%{http_code}" "http://127.0.0.1:8090" || echo "000")
+SF_CODE=$(curl -s -m 3 -o /dev/null -w "%{http_code}" "http://127.0.0.1:8090")
+[ -n "$SF_CODE" ] || SF_CODE=000
 if [ "$SF_CODE" = "200" ] || [ "$SF_CODE" = "301" ] || [ "$SF_CODE" = "302" ]; then
   check "GET :8090 → 2xx/3xx" 1
 else

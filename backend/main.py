@@ -113,6 +113,13 @@ def job_analysis(job_id: str):
     return summarize_openfoam_case(j["directory"])
 
 
+@app.get("/api/jobs/default/surface.vtp")
+def default_surface():
+    from cfd_analysis import ensure_default_surface
+    vtp = ensure_default_surface(JOBS / "default-surface.vtp")
+    return FileResponse(vtp, media_type="application/octet-stream", filename="surface.vtp")
+
+
 @app.get("/api/jobs/{job_id}/surface.vtp")
 def job_surface(job_id: str):
     if job_id not in REGISTRY:
@@ -120,12 +127,4 @@ def job_surface(job_id: str):
     vtp = REGISTRY[job_id]["directory"] / "surface.vtp"
     from cfd_analysis import export_surface
     export_surface(REGISTRY[job_id]["directory"], vtp)
-    return FileResponse(vtp, media_type="application/octet-stream", filename="surface.vtp")
-
-
-@app.get("/api/jobs/default/surface.vtp")
-def default_surface():
-    from cfd_analysis import ensure_default_surface
-    vtp = JOBS / "default-surface.vtp"
-    ensure_default_surface(vtp)
     return FileResponse(vtp, media_type="application/octet-stream", filename="surface.vtp")
