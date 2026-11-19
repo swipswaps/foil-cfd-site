@@ -47,6 +47,8 @@ jobs:
       - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
+      - run: python3 -m py_compile backend/main.py backend/cfd_analysis.py backend/job_retention.py
+      - run: python3 backend/test_job_retention.py
       - name: Start backend
         run: |
           docker compose up -d --build backend

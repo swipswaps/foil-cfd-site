@@ -10,7 +10,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py cfd_analysis.py ./
+COPY main.py cfd_analysis.py job_retention.py ./
 COPY cases ./cases
 RUN mkdir -p /app/jobs
 
