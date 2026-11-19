@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://swipswaps.github.io/foil-cfd-site').replace(/\/$/, '');
 const HOME = BASE + '/';
@@ -155,6 +156,25 @@ test.describe('advanced: backend API', () => {
     const surface = await request.get(`${API}/api/jobs/${job_id}/surface.vtp`);
     expect(surface.status()).toBe(200);
     expect(await surface.text()).toContain('VTKFile');
+  });
+
+  test('job retention keeps backend/jobs bounded', async ({ request }) => {
+    const jobsDir = resolve('backend/jobs');
+    if (!existsSync(jobsDir)) test.skip(true, 'backend/jobs not visible from the test runner');
+    const count = () =>
+      readdirSync(jobsDir, { withFileTypes: true }).filter((d) => d.isDirectory()).length;
+    const max = Number(process.env.FOIL_MAX_JOBS || 32);
+
+    for (let i = 0; i < max + 3; i++) {
+      const r = await request.post(`${API}/api/solve`, { data: { case_id: 'naca0012' } });
+      expect(r.ok()).toBeTruthy();
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+
+    expect(count()).toBeLessThanOrEqual(max + 2);
+    const def = await request.get(`${API}/api/jobs/default/surface.vtp`);
+    expect(def.status()).toBe(200);
+    expect(await def.text()).toContain('VTKFile');
   });
 });
 
