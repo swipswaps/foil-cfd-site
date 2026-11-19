@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test:e2e": "playwright test",
+    "test:e2e:advanced": "playwright test tests/e2e/foil-advanced.spec.ts --project=desktop-chrome",
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
