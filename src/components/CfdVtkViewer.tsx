@@ -26,6 +26,7 @@ interface VtkRefs {
   mapper: ReturnType<typeof vtkMapper.newInstance>;
   actor: ReturnType<typeof vtkActor.newInstance>;
   ro?: ResizeObserver;
+  added?: boolean;
 }
 
 export function CfdVtkViewer({ datasetUrl, field }: Props) {
@@ -54,7 +55,6 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
         const actor = vtkActor.newInstance();
         mapper.setInputConnection(reader.getOutputPort());
         actor.setMapper(mapper);
-        view.getRenderer().addActor(actor);
         const ro = new ResizeObserver(() => {
           const cur = vtkRef.current;
           if (!cur) return;
@@ -110,6 +110,10 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
           vtk.mapper.setScalarModeToUsePointFieldData();
         } else {
           vtk.mapper.setScalarVisibility(false);
+        }
+        if (!vtk.added) {
+          vtk.view.getRenderer().addActor(vtk.actor);
+          vtk.added = true;
         }
         vtk.view.getRenderer().resetCamera();
         vtk.view.getRenderWindow().render();

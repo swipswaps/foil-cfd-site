@@ -7,6 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   base: '/foil-cfd-site/',
+  define: { global: 'globalThis' },
   plugins: [react()],
   build: {
     chunkSizeWarningLimit: 800,
