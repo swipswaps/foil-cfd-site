@@ -81,6 +81,21 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(page.locator('#cfd')).toBeInViewport({ timeout: 5000 });
   });
 
+  test('hero tabs are keyboard accessible and sync the URL', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    const overview = page.getByRole('tab', { name: 'Overview' });
+    const lab = page.getByRole('tab', { name: '3D Lab' });
+    await overview.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(lab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#cfd')).toBeVisible({ timeout: 15000 });
+    expect(new URL(page.url()).hash).toBe('#cfd');
+    await page.keyboard.press('ArrowLeft');
+    await expect(overview).toHaveAttribute('aria-selected', 'true');
+    expect(new URL(page.url()).hash).toBe('');
+  });
+
   test('renders, orbits, recolours, charts data, and is responsive', async ({ page }) => {
     test.setTimeout(360_000);
     const errs: string[] = [];

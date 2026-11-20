@@ -15,8 +15,10 @@ export type CfdField = 'p' | 'U' | 'T';
 
 const STATIC_DEMO_DATASET = `${import.meta.env.BASE_URL}demo/surface.vtp`;
 
+const loadCfdLab = () => import('./sections/CfdLab');
+
 const CfdLab = lazy(() =>
-  import('./sections/CfdLab').then((m) => ({ default: m.CfdLab }))
+  loadCfdLab().then((m) => ({ default: m.CfdLab }))
 );
 
 function detectDevice(): DetectedDevice {
@@ -84,6 +86,8 @@ export default function App() {
       if (window.location.hash === '#cfd') {
         setHeroTab('lab');
         requestAnimationFrame(() => document.getElementById('cfd')?.scrollIntoView({ block: 'start' }));
+      } else {
+        setHeroTab('overview');
       }
     };
     const raf = requestAnimationFrame(apply);
@@ -93,6 +97,13 @@ export default function App() {
       window.removeEventListener('hashchange', apply);
     };
   }, []);
+
+  const handleHeroTab = (tab: 'overview' | 'lab') => {
+    setHeroTab(tab);
+    const url = tab === 'lab' ? '#cfd' : `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, '', url);
+    if (tab === 'overview') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
@@ -243,7 +254,8 @@ export default function App() {
             rotationY={rotationY}
             rotationZ={rotationZ}
             tab={heroTab}
-            onTabChange={setHeroTab}
+            onTabChange={handleHeroTab}
+            onPrefetchLab={loadCfdLab}
             lab={(
               <Suspense fallback={<CfdLabSkeleton />}>
                 <CfdLab
