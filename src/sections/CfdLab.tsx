@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
 import type { CfdField } from '../App';
+import type { CpPoint } from '../components/CpPolarChart';
 
 const CfdVtkViewer = lazy(() =>
   import('../components/CfdVtkViewer').then((m) => ({ default: m.CfdVtkViewer }))
@@ -10,11 +11,13 @@ const CpPolarChart = lazy(() =>
 );
 
 interface Props {
-  backendUrl: string;
   backendOnline: boolean;
   solverAvailable: boolean;
   field: CfdField;
   onFieldChange: (field: CfdField) => void;
+  sceneLabel: string;
+  cp?: { upper: CpPoint[]; lower: CpPoint[] };
+  chartNote?: string;
   datasetUrl: string;
   jobId: string | null;
   jobStatus: string;
@@ -25,8 +28,8 @@ const FieldSkeleton = ({ label }: { label: string }) => (
 );
 
 export function CfdLab({
-  backendUrl, backendOnline, solverAvailable, field, onFieldChange,
-  datasetUrl, jobId, jobStatus,
+  backendOnline, solverAvailable, field, onFieldChange,
+  sceneLabel, cp, chartNote, datasetUrl, jobId, jobStatus,
 }: Props) {
   return (
     <section id="cfd" className="cfd-lab">
@@ -38,7 +41,7 @@ export function CfdLab({
               ? solverAvailable
                 ? 'OpenFOAM ready'
                 : 'Solver unavailable · sample mesh'
-              : 'Static demo · sample wing'}
+              : 'Static demo'}
           </span>
           <label className="cfd-lab-field">
             Field
@@ -62,16 +65,21 @@ export function CfdLab({
             <CfdVtkViewer datasetUrl={datasetUrl} field={field} />
           </Suspense>
         </CfdVtkBoundary>
-        <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
-          <CpPolarChart />
-        </Suspense>
+        {cp ? (
+          <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
+            <CpPolarChart upper={cp.upper} lower={cp.lower} title={`${sceneLabel} · Cp vs x/c`} />
+          </Suspense>
+        ) : chartNote ? (
+          <div className="cfd-chart-note">{chartNote}</div>
+        ) : (
+          <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
+            <CpPolarChart />
+          </Suspense>
+        )}
       </div>
       <p className="cfd-lab-credit">
-        {backendOnline ? (
-          <>Viewing <code>{datasetUrl.replace(backendUrl, '')}</code></>
-        ) : (
-          <>Static demo · sample wing</>
-        )}
+        {sceneLabel}
+        {backendOnline ? '' : ' · static demo'}
       </p>
     </section>
   );

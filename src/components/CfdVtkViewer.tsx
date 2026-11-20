@@ -35,11 +35,23 @@ interface VtkRefs {
   added?: boolean;
 }
 
+interface VtkPointDataLike {
+  getArrayByName(name: string): { getComponent(tuple: number, component: number): number } | null;
+}
+
+interface VtkDataLike {
+  getNumberOfPoints(): number;
+  getPoints(): { getData(): ArrayLike<number> };
+  getPointData(): VtkPointDataLike;
+}
+
 export function CfdVtkViewer({ datasetUrl, field }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vtkRef = useRef<VtkRefs | null>(null);
   const initFailedRef = useRef(false);
+  const dataRef = useRef<VtkDataLike | null>(null);
   const [status, setStatus] = useState('Waiting for layout…');
+  const [legend, setLegend] = useState<{ name: string; lo: number; hi: number } | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -154,8 +166,12 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
           vtk.mapper.setScalarVisibility(true);
           vtk.mapper.setColorByArrayName(colorName);
           vtk.mapper.setScalarModeToUsePointFieldData();
+          dataRef.current = data as unknown as VtkDataLike;
+          setLegend({ name: colorName, lo, hi });
         } else {
           vtk.mapper.setScalarVisibility(false);
+          dataRef.current = data as unknown as VtkDataLike;
+          setLegend(null);
         }
         if (!vtk.added) {
           vtk.view.getRenderer().addActor(vtk.actor);
@@ -172,11 +188,96 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
     return () => { cancelled = true; };
   }, [datasetUrl, field]);
 
+  const exportVtp = async () => {
+    try {
+      const res = await fetch(datasetUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'surface.vtp';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setStatus('Export failed');
+    }
+  };
+
+  const exportCsv = () => {
+    const data = dataRef.current;
+    if (!data) return;
+    const pts = data.getPoints().getData();
+    const pd = data.getPointData();
+    const comp = (name: string, tuple: number, component: number) => {
+      const arr = pd.getArrayByName(name);
+      return arr ? arr.getComponent(tuple, component) : 0;
+    };
+    const rows = ['x,y,z,p,Ux,Uy,Uz,T'];
+    for (let i = 0; i < data.getNumberOfPoints(); i++) {
+      rows.push(
+        `${pts[i * 3]},${pts[i * 3 + 1]},${pts[i * 3 + 2]},${comp('p', i, 0)},${comp('U', i, 0)},${comp('U', i, 1)},${comp('U', i, 2)},${comp('T', i, 0)}`,
+      );
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'surface.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const setView = (mode: 'iso' | 'top' | 'side') => {
+    const vtk = vtkRef.current;
+    if (!vtk) return;
+    const renderer = vtk.view.getRenderer();
+    if (mode === 'iso') {
+      renderer.resetCamera();
+    } else {
+      const b = renderer.computeVisiblePropBounds();
+      const cx = (b[0] + b[1]) / 2;
+      const cy = (b[2] + b[3]) / 2;
+      const cz = (b[4] + b[5]) / 2;
+      const dist = Math.max(b[1] - b[0], b[3] - b[2], b[5] - b[4]) * 2 || 4;
+      const cam = renderer.getActiveCamera();
+      cam.setFocalPoint(cx, cy, cz);
+      if (mode === 'top') {
+        cam.setPosition(cx, cy + dist, cz);
+        cam.setViewUp(0, 0, -1);
+      } else {
+        cam.setPosition(cx + dist, cy, cz);
+        cam.setViewUp(0, 1, 0);
+      }
+      renderer.resetCameraClippingRange();
+    }
+    vtk.view.getRenderWindow().render();
+  };
+
   return (
     <section className="cfd-vtk">
       <header className="cfd-vtk-head">
-        <span>{status}</span>
-        <span className="cfd-vtk-field-badge">{field.toUpperCase()}</span>
+        <div className="cfd-vtk-statusline">
+          <span>{status}</span>
+          <span className="cfd-vtk-field-badge">{field.toUpperCase()}</span>
+        </div>
+        {legend && (
+          <div className="cfd-vtk-legend">
+            <span>{legend.lo.toFixed(2)}</span>
+            <span className="cfd-vtk-legend-bar" aria-hidden="true" />
+            <span>{legend.hi.toFixed(2)}</span>
+            <span className="cfd-vtk-legend-name">
+              {legend.name === 'Umag' ? '|U|' : legend.name.toUpperCase()}
+            </span>
+          </div>
+        )}
+        <div className="cfd-vtk-actions">
+          <button type="button" onClick={() => setView('iso')}>Reset</button>
+          <button type="button" onClick={() => setView('top')}>Top</button>
+          <button type="button" onClick={() => setView('side')}>Side</button>
+          <button type="button" onClick={exportVtp}>Export VTP</button>
+          <button type="button" onClick={exportCsv}>Export CSV</button>
+        </div>
       </header>
       <div ref={containerRef} className="cfd-vtk-canvas" />
     </section>

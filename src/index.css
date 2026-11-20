@@ -1273,3 +1273,59 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   .hero-lab-preview img { width: 84px; height: 48px; }
   .hero-actions { gap: 0.5rem; }
 }
+
+/* Viewer toolbar: legend + export/camera */
+.cfd-vtk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+.cfd-vtk-statusline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cfd-vtk-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  color: #7FB6D4;
+}
+.cfd-vtk-legend-bar {
+  width: 96px;
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid #1E3A4A;
+  background: linear-gradient(90deg, #3b4cc0, #dddddd, #b40426);
+}
+.cfd-vtk-legend-name { color: #93C5FD; }
+.cfd-vtk-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.cfd-vtk-actions button {
+  background: #0F2942;
+  color: #E0F2FE;
+  border: 1px solid #1E4976;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.cfd-vtk-actions button:hover { border-color: #38BDF8; }
+.cfd-chart-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 1.25rem;
+  background: #081A2C;
+  border: 1px solid #16324F;
+  border-radius: 10px;
+  color: #94C3DF;
+  font-size: 0.85rem;
+  text-align: center;
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { NavBar } from './components/NavBar';
 import { Sidebar } from './components/Sidebar';
 import { BackendBadge } from './components/BackendBadge';
@@ -9,6 +9,7 @@ import { ProjectShowcase } from './sections/ProjectShowcase';
 import { useBackendProbe } from './hooks/useBackendProbe';
 import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
 import type { SceneContent } from './data/scene';
+import { buildSceneLab, type SceneLab } from './lib/sceneVtp';
 
 export type CfdField = 'p' | 'U' | 'T';
 
@@ -64,6 +65,18 @@ export default function App() {
   const [cfdJobStatus, setCfdJobStatus] = useState<string>('idle');
   const [cfdError, setCfdError] = useState<string | null>(null);
   const [cfdJobDatasetUrl, setCfdJobDatasetUrl] = useState<string | null>(null);
+
+  const sceneLab = useMemo<SceneLab | null>(() => {
+    try {
+      return buildSceneLab(sceneContent);
+    } catch {
+      return null;
+    }
+  }, [sceneContent]);
+  useEffect(() => {
+    if (!sceneLab) return;
+    return () => sceneLab.revoke();
+  }, [sceneLab]);
 
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
@@ -151,7 +164,8 @@ export default function App() {
   const resetRotation = () => { setRotationX(0); setRotationY(0); setRotationZ(0); };
 
   const backendOnline = backend.status === 'online' && !!backend.backendOrigin;
-  const labDatasetUrl = backendOnline && datasetUrl ? datasetUrl : STATIC_DEMO_DATASET;
+  const labDatasetUrl = sceneLab?.url ?? (backendOnline && datasetUrl ? datasetUrl : STATIC_DEMO_DATASET);
+  const labLabel = sceneLab?.label ?? (backendOnline ? 'Backend dataset' : 'Sample wing');
 
   return (
     <div className="app-shell">
@@ -210,11 +224,13 @@ export default function App() {
           />
           <Suspense fallback={<CfdLabSkeleton />}>
             <CfdLab
-              backendUrl={backend.backendOrigin}
               backendOnline={backendOnline}
               solverAvailable={backendOnline && backend.solverAvailable}
               field={cfdField}
               onFieldChange={setCfdField}
+              sceneLabel={labLabel}
+              cp={sceneLab?.cp}
+              chartNote={sceneLab?.kind === 'model' ? '3D model · field-colored surface (the Cp chart applies to airfoils)' : undefined}
               datasetUrl={labDatasetUrl}
               jobId={backendOnline ? cfdJobId : null}
               jobStatus={backendOnline ? cfdJobStatus : 'static'}

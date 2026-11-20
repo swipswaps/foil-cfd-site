@@ -69,7 +69,7 @@ test.describe('3D lab UX (static, no backend)', () => {
   });
 
   test('renders, orbits, recolours, charts data, and is responsive', async ({ page }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
     const errs: string[] = [];
     page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
     page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -86,7 +86,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     const canvas = await waitForLab(page);
     expect(Date.now() - t0).toBeLessThan(25000);
     await expect(page.locator('.cfd-vtk-head')).toContainText(/\d+ pts · \d+ cells/);
-    await expect(page.locator('#cfd').getByText(/Static demo · sample wing/i).first()).toBeVisible();
+    await expect(page.locator('#cfd').getByText(/Sample wing/i).first()).toBeVisible();
     expect(await page.getByRole('button', { name: /Generate synthetic preview|Run simpleFoam/i }).count()).toBe(0);
 
     const canvasBox = await canvas.boundingBox();
@@ -139,6 +139,21 @@ test.describe('3D lab UX (static, no backend)', () => {
     const afterField = await page.screenshot({ clip: b3 });
     expect(afterField.equals(beforeField)).toBe(false);
 
+    await expect(page.locator('.cfd-vtk-legend')).toBeVisible();
+    await expect(page.locator('.cfd-vtk-legend')).toContainText(/\d/);
+    const vtpEvt = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export VTP' }).click();
+    expect((await vtpEvt).suggestedFilename()).toMatch(/surface\.vtp/);
+    const csvEvt = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    expect((await csvEvt).suggestedFilename()).toMatch(/surface\.csv/);
+
+    await page.locator('.cfd-vtk-actions').getByRole('button', { name: 'Reset', exact: true }).click();
+    await page.waitForTimeout(600);
+    await centerCanvas(page);
+    const afterReset = await page.screenshot({ clip: roundBox((await canvas.boundingBox())!) });
+    expect(afterReset.equals(afterField)).toBe(false);
+
     expect(errs.filter(e => !BENIGN.test(e))).toEqual([]);
   });
 
@@ -162,5 +177,55 @@ test.describe('3D lab UX (static, no backend)', () => {
           chBox.y + chBox.height <= cBox.y);
       expect(overlapMobile).toBe(false);
     }
+  });
+
+  test('selected NACA code drives the lab', async ({ page }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    const burger = page.getByRole('button', { name: /open sidebar/i }).first();
+    await burger.scrollIntoViewIfNeeded();
+    await burger.click();
+    await expect(page.locator('.app-sidebar').first()).toHaveClass(/open/);
+    await page.getByLabel('NACA 4-digit code').fill('2412');
+    await page.locator('.upload-row').getByRole('button', { name: 'Apply' }).first().click();
+    await page.keyboard.press('Escape');
+    await page.locator('#cfd').scrollIntoViewIfNeeded();
+    const lab = page.locator('#cfd');
+    await expect(lab.getByText(/NACA 2412/).first()).toBeVisible({ timeout: 15000 });
+    await expect(lab.locator('.cfd-vtk-head')).toContainText(/\d+ pts/, { timeout: 20000 });
+    await expect(lab.locator('.cfd-vtk-legend')).toBeVisible();
+    await expect(lab.locator('.cfd-chart .js-plotly-plot')).toBeVisible({ timeout: 15000 });
+  });
+
+  test('uploaded model drives the lab', async ({ page }) => {
+    test.setTimeout(150_000);
+    const stl = '/tmp/foil-model-test.stl';
+    writeFileSync(stl, [
+      'solid test',
+      '  facet normal 0 0 1',
+      '    outer loop',
+      '      vertex 0 0 0',
+      '      vertex 1 0 0',
+      '      vertex 0 1 0',
+      '    endloop',
+      '  endfacet',
+      'endsolid test',
+      '',
+    ].join('\n'));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    const burger = page.getByRole('button', { name: /open sidebar/i }).first();
+    await burger.scrollIntoViewIfNeeded();
+    await burger.click();
+    await expect(page.locator('.app-sidebar').first()).toHaveClass(/open/);
+    await page.locator('input[type="file"]').first().setInputFiles(stl);
+    await expect(page.getByText(/Showing: foil-model-test\.stl/)).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('Escape');
+    await page.locator('#cfd').scrollIntoViewIfNeeded();
+    const lab = page.locator('#cfd');
+    await expect(lab.getByText(/foil-model-test\.stl/).first()).toBeVisible({ timeout: 15000 });
+    await expect(lab.locator('.cfd-vtk-head')).toContainText(/\d+ pts/, { timeout: 20000 });
+    await expect(lab.locator('.cfd-chart-note')).toBeVisible();
   });
 });
