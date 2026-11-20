@@ -247,7 +247,16 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     if (!vtk) return;
     const renderer = vtk.view.getRenderer();
     if (mode === 'iso') {
-      renderer.resetCamera();
+      const b = renderer.computeVisiblePropBounds();
+      const cx = (b[0] + b[1]) / 2;
+      const cy = (b[2] + b[3]) / 2;
+      const cz = (b[4] + b[5]) / 2;
+      const dist = Math.max(b[1] - b[0], b[3] - b[2], b[5] - b[4]) * 2 || 4;
+      const cam = renderer.getActiveCamera();
+      cam.setFocalPoint(cx, cy, cz);
+      cam.setPosition(cx + dist, cy - dist, cz + dist);
+      cam.setViewUp(0, 0, 1);
+      renderer.resetCameraClippingRange();
     } else {
       const b = renderer.computeVisiblePropBounds();
       const cx = (b[0] + b[1]) / 2;

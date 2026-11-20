@@ -27,6 +27,7 @@ test.describe('static demo (no backend)', () => {
       { timeout: 15000 },
     );
 
+    await page.getByRole('tab', { name: /3D Lab/i }).first().click();
     await page.locator('#cfd').scrollIntoViewIfNeeded();
     await expect(page.getByRole('heading', { name: /CFD Laboratory/i }).first()).toBeVisible({ timeout: 20000 });
     await expect(page.locator('.cfd-chart svg').first()).toBeVisible({ timeout: 25000 });

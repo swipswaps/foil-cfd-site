@@ -20,7 +20,20 @@ const roundBox = (box: { x: number; y: number; width: number; height: number }) 
   height: Math.max(1, Math.round(box.height)),
 });
 
+async function openLab(page) {
+  if (!(await page.locator('#cfd').count())) {
+    const tab = page.getByRole('tab', { name: /3D Lab/i }).first();
+    if (await tab.count()) {
+      await tab.click();
+    } else {
+      await page.getByRole('link', { name: /Open 3D CFD Lab/i }).first().click();
+    }
+  }
+  await expect(page.locator('#cfd')).toBeVisible({ timeout: 15000 });
+}
+
 async function waitForLab(page) {
+  await openLab(page);
   await page.locator('#cfd').scrollIntoViewIfNeeded();
   await expect(page.getByRole('heading', { name: /CFD Laboratory/i }).first()).toBeVisible({ timeout: 20000 });
   const canvas = page.locator('.cfd-vtk-canvas canvas').first();
@@ -161,7 +174,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(HOME, { waitUntil: 'load' });
-    await page.locator('#cfd').scrollIntoViewIfNeeded();
+    await openLab(page);
     await expect(page.locator('.cfd-vtk-canvas canvas').first()).toBeVisible({ timeout: 20000 });
     const scrollW = await page.evaluate(() => document.documentElement.scrollWidth);
     const innerW = await page.evaluate(() => window.innerWidth);
@@ -190,7 +203,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     await page.getByLabel('NACA 4-digit code').fill('2412');
     await page.locator('.upload-row').getByRole('button', { name: 'Apply' }).first().click();
     await page.keyboard.press('Escape');
-    await page.locator('#cfd').scrollIntoViewIfNeeded();
+    await openLab(page);
     const lab = page.locator('#cfd');
     await expect(lab.getByText(/NACA 2412/).first()).toBeVisible({ timeout: 15000 });
     await expect(lab.locator('.cfd-vtk-head')).toContainText(/\d+ pts/, { timeout: 20000 });
@@ -222,7 +235,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     await page.locator('input[type="file"]').first().setInputFiles(stl);
     await expect(page.getByText(/Showing: foil-model-test\.stl/)).toBeVisible({ timeout: 15000 });
     await page.keyboard.press('Escape');
-    await page.locator('#cfd').scrollIntoViewIfNeeded();
+    await openLab(page);
     const lab = page.locator('#cfd');
     await expect(lab.getByText(/foil-model-test\.stl/).first()).toBeVisible({ timeout: 15000 });
     await expect(lab.locator('.cfd-vtk-head')).toContainText(/\d+ pts/, { timeout: 20000 });

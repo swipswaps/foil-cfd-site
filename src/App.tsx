@@ -10,7 +10,6 @@ import { useBackendProbe } from './hooks/useBackendProbe';
 import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
 import type { SceneContent } from './data/scene';
 import { buildSceneLab, type SceneLab } from './lib/sceneVtp';
-import { LazyMount } from './components/LazyMount';
 
 export type CfdField = 'p' | 'U' | 'T';
 
@@ -54,6 +53,7 @@ export default function App() {
   const [devicePick, setDevicePick] = useState<DevicePick>(() => detectDevice());
   const [detectedDevice, setDetectedDevice] = useState<DetectedDevice>(detectDevice);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [heroTab, setHeroTab] = useState<'overview' | 'lab'>('overview');
   const [sceneContent, setSceneContent] = useState<SceneContent>({ kind: 'default', token: 0 });
   const [flow, setFlow] = useState(true);
   const [speed, setSpeed] = useState(2.0);
@@ -78,6 +78,21 @@ export default function App() {
     if (!sceneLab) return;
     return () => sceneLab.revoke();
   }, [sceneLab]);
+
+  useEffect(() => {
+    const apply = () => {
+      if (window.location.hash === '#cfd') {
+        setHeroTab('lab');
+        requestAnimationFrame(() => document.getElementById('cfd')?.scrollIntoView({ block: 'start' }));
+      }
+    };
+    const raf = requestAnimationFrame(apply);
+    window.addEventListener('hashchange', apply);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('hashchange', apply);
+    };
+  }, []);
 
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
@@ -227,27 +242,29 @@ export default function App() {
             rotationX={rotationX}
             rotationY={rotationY}
             rotationZ={rotationZ}
+            tab={heroTab}
+            onTabChange={setHeroTab}
+            lab={(
+              <Suspense fallback={<CfdLabSkeleton />}>
+                <CfdLab
+                  backendOnline={backendOnline}
+                  solverAvailable={backendOnline && backend.solverAvailable}
+                  field={cfdField}
+                  onFieldChange={setCfdField}
+                  sceneLabel={labLabel}
+                  cp={sceneLab?.cp}
+                  chartNote={sceneLab?.kind === 'model' ? '3D model · field-colored surface (the Cp chart applies to airfoils)' : undefined}
+                  datasetUrl={labDatasetUrl}
+                  jobId={backendOnline ? cfdJobId : null}
+                  jobStatus={backendOnline ? cfdJobStatus : 'static'}
+                  rotationX={rotationX}
+                  rotationY={rotationY}
+                  rotationZ={rotationZ}
+                  provenance={provenance}
+                />
+              </Suspense>
+            )}
           />
-          <LazyMount id="cfd">
-            <Suspense fallback={<CfdLabSkeleton />}>
-            <CfdLab
-              backendOnline={backendOnline}
-              solverAvailable={backendOnline && backend.solverAvailable}
-              field={cfdField}
-              onFieldChange={setCfdField}
-              sceneLabel={labLabel}
-              cp={sceneLab?.cp}
-              chartNote={sceneLab?.kind === 'model' ? '3D model · field-colored surface (the Cp chart applies to airfoils)' : undefined}
-              datasetUrl={labDatasetUrl}
-              jobId={backendOnline ? cfdJobId : null}
-              jobStatus={backendOnline ? cfdJobStatus : 'static'}
-              rotationX={rotationX}
-              rotationY={rotationY}
-              rotationZ={rotationZ}
-              provenance={provenance}
-            />
-            </Suspense>
-          </LazyMount>
           <ReadmeSection />
           <ProjectShowcase />
           <footer className="footer">

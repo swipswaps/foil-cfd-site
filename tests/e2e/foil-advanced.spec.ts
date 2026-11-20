@@ -15,6 +15,13 @@ const BENIGN = new RegExp([
   /WebGL/i,
 ].map(r => r.source).join('|'));
 
+async function openLab(page) {
+  if (!(await page.locator('#cfd').count())) {
+    await page.getByRole('tab', { name: /3D Lab/i }).first().click();
+  }
+  await expect(page.locator('#cfd')).toBeVisible({ timeout: 15_000 });
+}
+
 async function openSidebar(page) {
   const burger = page.getByRole('button', { name: /open sidebar/i }).first();
   if (await burger.count()) await burger.click();
@@ -75,6 +82,7 @@ test.describe('advanced: home + sidebar', () => {
     if (!(await page.getByText(/Backend online/).count())) {
       test.skip(true, 'backend not online; chart is gated on backendOnline && datasetUrl');
     }
+    await openLab(page);
     await page.locator('#cfd').scrollIntoViewIfNeeded();
     await expect(page.getByRole('heading', { name: /CFD Laboratory/i }).first()).toBeVisible({ timeout: 20_000 });
     const chart = page.locator('.cfd-chart svg').first();
@@ -90,6 +98,7 @@ test.describe('advanced: home + sidebar', () => {
     if (!(await page.getByText(/Backend online/).count())) {
       test.skip(true, 'backend not online');
     }
+    await openLab(page);
     await openSidebar(page);
     const solve = page.getByRole('button', { name: /Generate synthetic preview|Run simpleFoam/i }).first();
     await expect(solve).toBeVisible({ timeout: 10_000 });

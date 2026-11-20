@@ -1348,3 +1348,35 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   outline: 2px solid #38BDF8;
   outline-offset: 2px;
 }
+
+/* Hero tabs + in-hero lab */
+.hero-tabs {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.65rem;
+}
+.hero-tab {
+  background: rgba(6, 19, 32, 0.72);
+  color: #BAE6FD;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.hero-tab[aria-selected="true"] { background: #0EA5E9; color: #04101D; border-color: #0EA5E9; }
+@media (max-width: 600px) {
+  .hero-tabs { top: 3.4rem; }
+}
+.hero-lab {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  padding: 4.5rem 1.5rem 2rem;
+  background: #06121A;
+}
