@@ -55,9 +55,13 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
         const actor = vtkActor.newInstance();
         mapper.setInputConnection(reader.getOutputPort());
         actor.setMapper(mapper);
+        let lastSize = '';
         const ro = new ResizeObserver(() => {
           const cur = vtkRef.current;
           if (!cur) return;
+          const next = `${container.clientWidth}x${container.clientHeight}`;
+          if (next === lastSize) return;
+          lastSize = next;
           try { cur.view.resize(); cur.view.getRenderWindow().render(); } catch { /* noop */ }
         });
         ro.observe(container);

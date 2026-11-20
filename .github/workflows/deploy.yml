@@ -93,7 +93,7 @@ jobs:
             sleep 2
           done
           set +e
-          npx playwright test tests/e2e/foil-static.spec.ts --project=desktop-chrome --retries=1 --workers=1
+          npx playwright test tests/e2e/foil-static.spec.ts tests/e2e/foil-ux.spec.ts --project=desktop-chrome --retries=1 --workers=1
           rc=$?
           kill "$PREVIEW_PID" 2>/dev/null || true
           cat /tmp/preview-static.log
