@@ -32,6 +32,7 @@ interface Props {
   cfdError: string | null;
   onCfdSolve: () => void;
   lastProbe: ProbeSample | null;
+  onFocusProbe: () => void;
 }
 
 export function Sidebar({
@@ -43,7 +44,7 @@ export function Sidebar({
   rotationX, rotationY, rotationZ, onRotationChange, onRotationReset,
   cadStatus, cadUrl, onCadRetry,
   backendUrl, solverAvailable, onBackendRetry,
-  cfdJobId, cfdJobStatus, cfdError, onCfdSolve, lastProbe,
+  cfdJobId, cfdJobStatus, cfdError, onCfdSolve, lastProbe, onFocusProbe,
 }: Props) {
   const solving = cfdJobStatus === 'running' || cfdJobStatus === 'submitting';
   const portLabel = backendUrl ? backendUrl.replace(/^https?:\/\//, '') : 'offline';
@@ -156,16 +157,21 @@ export function Sidebar({
           Jump to 3D lab ↓
         </a>
 
-        <div className="cfd-sidebar-probe" aria-live="polite">
-          {lastProbe ? (
-            <>
-              <span className="cfd-sidebar-probe-label">Last probe</span>
-              p {fmtProbe(lastProbe.p)} · |U| {fmtProbe(lastProbe.u)} · T {fmtProbe(lastProbe.t)}
-            </>
-          ) : (
+        {lastProbe ? (
+          <button
+            type="button"
+            className="cfd-sidebar-probe cfd-sidebar-probe-btn"
+            onClick={() => { onFocusProbe(); onClose(); }}
+            title="Re-center the 3D camera on this sample"
+          >
+            <span className="cfd-sidebar-probe-label">Last probe · re-center</span>
+            p {fmtProbe(lastProbe.p)} · |U| {fmtProbe(lastProbe.u)} · T {fmtProbe(lastProbe.t)}
+          </button>
+        ) : (
+          <div className="cfd-sidebar-probe" aria-live="polite">
             <span className="cfd-sidebar-probe-muted">No probe yet · click the 3D surface</span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="sidebar-section">

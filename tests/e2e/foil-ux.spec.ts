@@ -224,12 +224,33 @@ test.describe('3D lab UX (static, no backend)', () => {
     const firstLine = readFileSync(csvPath!, 'utf8').split('\n')[0];
     expect(firstLine).toMatch(/^# probe x=-?\d+\.\d+ y=-?\d+\.\d+ z=-?\d+\.\d+ p=.* U=.* T=.*/);
 
+    const jsonEvt = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export probe JSON' }).click();
+    const json = await jsonEvt;
+    expect(json.suggestedFilename()).toBe('probe.json');
+    const payload = JSON.parse(readFileSync((await json.path())!, 'utf8'));
+    expect(payload.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(payload.field).toBe('p');
+    expect(payload.datasetUrl).toMatch(/surface\.vtp/);
+    expect(payload.freeStream.speed).toBe(2);
+    expect(payload.freeStream.chord).toBe(1);
+    expect(payload.freeStream.temperature).toBeCloseTo(288.15, 2);
+    expect(payload.freeStream.reynolds).toBeCloseTo(133333.33, 0);
+    expect(payload.freeStream.dynamicPressure).toBeCloseTo(2.45, 2);
+    expect(Number.isFinite(payload.probe.p)).toBe(true);
+    expect(Number.isFinite(payload.probe.U)).toBe(true);
+    expect(Number.isFinite(payload.probe.T)).toBe(true);
+
     await page.getByRole('button', { name: /open sidebar/i }).first().click();
     await expect(page.locator('.app-sidebar').first()).toHaveClass(/open/);
     const last = page.locator('.cfd-sidebar-probe');
     await expect(last).toContainText(/Last probe/);
     await expect(last).toContainText(/\|U\|/);
-    await page.keyboard.press('Escape');
+
+    await page.locator('.cfd-sidebar-probe-btn').click();
+    await expect(page.locator('.app-sidebar').first()).not.toHaveClass(/open/);
+    await expect(page.locator('.cfd-vtk-announce')).toContainText(/Centered on probe/);
+    await expect(probe).toBeVisible();
 
     await probe.getByRole('button', { name: /clear probe/i }).click();
     await expect(probe).toHaveCount(0);

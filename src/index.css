@@ -1507,3 +1507,16 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   text-transform: uppercase;
 }
 .cfd-sidebar-probe-muted { color: #5E8FA8; font-style: italic; }
+
+.cfd-sidebar-probe-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #0F2942;
+  border: 1px solid #1E4976;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+}
+.cfd-sidebar-probe-btn:hover { border-color: #38BDF8; }
+.cfd-sidebar-probe-btn:focus-visible { outline: 2px solid #38BDF8; outline-offset: 2px; }

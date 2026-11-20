@@ -19,7 +19,7 @@ import vtkDataArray from '@kitware/vtk.js/Common/Core/DataArray';
 import vtkColorTransferFunction from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction';
 import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
 import vtkPointPicker from '@kitware/vtk.js/Rendering/Core/PointPicker';
-import { fmtProbe, type ProbeSample } from '../lib/probe';
+import { fmtProbe, type FreeStream, type ProbeSample } from '../lib/probe';
 
 interface Props {
   datasetUrl: string;
@@ -28,6 +28,8 @@ interface Props {
   rotationY: number;
   rotationZ: number;
   onProbe?: (sample: ProbeSample | null) => void;
+  freeStream?: FreeStream;
+  focusRequest?: { sample: ProbeSample; nonce: number } | null;
 }
 
 interface VtkRefs {
@@ -58,6 +60,8 @@ interface Probe extends ProbeSample {
 }
 
 interface CameraLike {
+  getFocalPoint(): number[];
+  getPosition(): number[];
   setFocalPoint(x: number, y: number, z: number): void;
   setPosition(x: number, y: number, z: number): void;
   setViewUp(x: number, y: number, z: number): void;
@@ -103,7 +107,7 @@ function fitOrtho(renderer: RendererLike, mode: 'top' | 'side') {
   renderer.resetCameraClippingRange();
 }
 
-export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ, onProbe }: Props) {
+export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ, onProbe, freeStream, focusRequest }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vtkRef = useRef<VtkRefs | null>(null);
   const initFailedRef = useRef(false);
@@ -112,6 +116,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
   const [status, setStatus] = useState('Waiting for layout…');
   const [legend, setLegend] = useState<{ name: string; lo: number; hi: number } | null>(null);
   const [probe, setProbe] = useState<Probe | null>(null);
+  const [announcement, setAnnouncement] = useState('');
   const downRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -269,6 +274,44 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     vtk.view.getRenderWindow().render();
   }, [rotationX, rotationY, rotationZ]);
 
+  useEffect(() => {
+    if (!focusRequest) return;
+    const vtk = vtkRef.current;
+    if (!vtk) return;
+    const renderer = vtk.view.getRenderer();
+    const cam = renderer.getActiveCamera() as unknown as CameraLike;
+    const fp = cam.getFocalPoint();
+    const pos = cam.getPosition();
+    const { x, y, z } = focusRequest.sample;
+    cam.setFocalPoint(x, y, z);
+    cam.setPosition(pos[0] + (x - fp[0]), pos[1] + (y - fp[1]), pos[2] + (z - fp[2]));
+    renderer.resetCameraClippingRange();
+    vtk.view.getRenderWindow().render();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setProbe((prev) => (prev ? { ...prev, left: rect.width / 2, top: rect.height / 2 } : prev));
+    }
+    setAnnouncement(`Centered on probe ${fmtProbe(x)}, ${fmtProbe(y)}, ${fmtProbe(z)}`);
+  }, [focusRequest]);
+
+  const exportProbeJson = () => {
+    if (!probe) return;
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      datasetUrl,
+      field,
+      freeStream: freeStream ?? null,
+      probe: { x: probe.x, y: probe.y, z: probe.z, p: probe.p, U: probe.u, T: probe.t },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'probe.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportVtp = async () => {
     try {
       const res = await fetch(datasetUrl);
@@ -421,9 +464,20 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
           <button type="button" onClick={() => setView('side')}>Side</button>
           <button type="button" onClick={exportVtp}>Export VTP</button>
           <button type="button" onClick={exportCsv}>Export CSV</button>
+          <button
+            type="button"
+            onClick={exportProbeJson}
+            disabled={!probe}
+            title={probe ? 'Download probe.json with free-stream and Re context' : 'Probe the surface first'}
+          >
+            Export probe JSON
+          </button>
           <span className="cfd-vtk-hint">Click surface to probe</span>
         </div>
       </header>
+      <span className="sr-only cfd-vtk-announce" role="status" aria-live="polite">
+        {announcement}
+      </span>
       <div
         className="cfd-vtk-canvas"
         role="img"

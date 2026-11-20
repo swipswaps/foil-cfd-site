@@ -58,6 +58,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [heroTab, setHeroTab] = useState<'overview' | 'lab'>('overview');
   const [lastProbe, setLastProbe] = useState<ProbeSample | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ sample: ProbeSample; nonce: number } | null>(null);
   const [sceneContent, setSceneContent] = useState<SceneContent>({ kind: 'default', token: 0 });
   const [flow, setFlow] = useState(true);
   const [speed, setSpeed] = useState(2.0);
@@ -237,6 +238,7 @@ export default function App() {
           cfdError={cfdError}
           onCfdSolve={startCfdSolve}
           lastProbe={lastProbe}
+          onFocusProbe={() => { if (lastProbe) setFocusRequest({ sample: lastProbe, nonce: Date.now() }); }}
         />
         {sidebarOpen && (
           <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
@@ -274,6 +276,7 @@ export default function App() {
                   jobStatus={backendOnline ? cfdJobStatus : 'static'}
                   speed={speed}
                   onProbe={setLastProbe}
+                  focusRequest={focusRequest}
                   rotationX={rotationX}
                   rotationY={rotationY}
                   rotationZ={rotationZ}

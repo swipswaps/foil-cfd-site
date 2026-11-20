@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
 import type { CfdField } from '../App';
 import type { CpPoint } from '../components/CpPolarChart';
-import type { ProbeSample } from '../lib/probe';
+import { freeStream, formatRe, type ProbeSample } from '../lib/probe';
 
 const CfdVtkViewer = lazy(() =>
   import('../components/CfdVtkViewer').then((m) => ({ default: m.CfdVtkViewer }))
@@ -28,19 +28,7 @@ interface Props {
   jobStatus: string;
   speed: number;
   onProbe?: (sample: ProbeSample | null) => void;
-}
-
-const CHORD_M = 1.0;
-const NU_AIR = 1.5e-5;
-const RHO_AIR = 1.225;
-const T_INF_K = 288.15;
-
-function formatRe(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return '—';
-  const exp = Math.floor(Math.log10(value));
-  const mantissa = value / 10 ** exp;
-  const superscript = String(exp).replace(/-/g, '⁻').replace(/\d/g, (d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(d)]);
-  return `${mantissa.toFixed(1)}×10${superscript}`;
+  focusRequest?: { sample: ProbeSample; nonce: number } | null;
 }
 
 const FieldSkeleton = ({ label }: { label: string }) => (
@@ -49,10 +37,9 @@ const FieldSkeleton = ({ label }: { label: string }) => (
 
 export function CfdLab({
   backendOnline, solverAvailable, field, onFieldChange,
-  sceneLabel, cp, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed, onProbe,
+  sceneLabel, cp, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed, onProbe, focusRequest,
 }: Props) {
-  const reynolds = (speed * CHORD_M) / NU_AIR;
-  const qInf = 0.5 * RHO_AIR * speed * speed;
+  const stream = freeStream(speed);
   return (
     <section className="cfd-lab">
       <header className="cfd-lab-head">
@@ -79,11 +66,11 @@ export function CfdLab({
         </div>
       </header>
       <div className="cfd-lab-freestream" aria-label="Free-stream conditions">
-        <span title="Free-stream velocity">U∞ {speed.toFixed(1)} m/s</span>
-        <span title="Reference chord">c {CHORD_M.toFixed(1)} m</span>
-        <span title="Reynolds number based on chord">Re {formatRe(reynolds)}</span>
-        <span title="Dynamic pressure">q∞ {Math.round(qInf)} Pa</span>
-        <span title="Static temperature">T∞ {T_INF_K.toFixed(0)} K</span>
+        <span title="Free-stream velocity">U∞ {stream.speed.toFixed(1)} m/s</span>
+        <span title="Reference chord">c {stream.chord.toFixed(1)} m</span>
+        <span title="Reynolds number based on chord">Re {formatRe(stream.reynolds)}</span>
+        <span title="Dynamic pressure">q∞ {Math.round(stream.dynamicPressure)} Pa</span>
+        <span title="Static temperature">T∞ {stream.temperature.toFixed(0)} K</span>
       </div>
       {jobId && (
         <div className="cfd-job-status">Job {jobId.slice(0, 8)} · {jobStatus}</div>
@@ -91,7 +78,7 @@ export function CfdLab({
       <div className="cfd-lab-grid">
         <CfdVtkBoundary>
           <Suspense fallback={<FieldSkeleton label="VTK viewer" />}>
-            <CfdVtkViewer datasetUrl={datasetUrl} field={field} rotationX={rotationX} rotationY={rotationY} rotationZ={rotationZ} onProbe={onProbe} />
+            <CfdVtkViewer datasetUrl={datasetUrl} field={field} rotationX={rotationX} rotationY={rotationY} rotationZ={rotationZ} onProbe={onProbe} freeStream={stream} focusRequest={focusRequest} />
           </Suspense>
         </CfdVtkBoundary>
         {cp ? (
