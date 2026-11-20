@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
 import type { CfdField } from '../App';
 import type { CpPoint } from '../components/CpPolarChart';
+import type { ProbeSample } from '../lib/probe';
 
 const CfdVtkViewer = lazy(() =>
   import('../components/CfdVtkViewer').then((m) => ({ default: m.CfdVtkViewer }))
@@ -26,6 +27,7 @@ interface Props {
   jobId: string | null;
   jobStatus: string;
   speed: number;
+  onProbe?: (sample: ProbeSample | null) => void;
 }
 
 const CHORD_M = 1.0;
@@ -47,7 +49,7 @@ const FieldSkeleton = ({ label }: { label: string }) => (
 
 export function CfdLab({
   backendOnline, solverAvailable, field, onFieldChange,
-  sceneLabel, cp, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed,
+  sceneLabel, cp, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed, onProbe,
 }: Props) {
   const reynolds = (speed * CHORD_M) / NU_AIR;
   const qInf = 0.5 * RHO_AIR * speed * speed;
@@ -89,7 +91,7 @@ export function CfdLab({
       <div className="cfd-lab-grid">
         <CfdVtkBoundary>
           <Suspense fallback={<FieldSkeleton label="VTK viewer" />}>
-            <CfdVtkViewer datasetUrl={datasetUrl} field={field} rotationX={rotationX} rotationY={rotationY} rotationZ={rotationZ} />
+            <CfdVtkViewer datasetUrl={datasetUrl} field={field} rotationX={rotationX} rotationY={rotationY} rotationZ={rotationZ} onProbe={onProbe} />
           </Suspense>
         </CfdVtkBoundary>
         {cp ? (

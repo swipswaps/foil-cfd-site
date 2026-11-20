@@ -1,6 +1,7 @@
 import { DevicePanel, type DevicePick, type DetectedDevice } from './DevicePanel';
 import { ModelUploader } from './ModelUploader';
 import type { SceneContent } from '../data/scene';
+import { fmtProbe, type ProbeSample } from '../lib/probe';
 
 interface Props {
   open: boolean;
@@ -30,6 +31,7 @@ interface Props {
   cfdJobStatus: string;
   cfdError: string | null;
   onCfdSolve: () => void;
+  lastProbe: ProbeSample | null;
 }
 
 export function Sidebar({
@@ -41,7 +43,7 @@ export function Sidebar({
   rotationX, rotationY, rotationZ, onRotationChange, onRotationReset,
   cadStatus, cadUrl, onCadRetry,
   backendUrl, solverAvailable, onBackendRetry,
-  cfdJobId, cfdJobStatus, cfdError, onCfdSolve,
+  cfdJobId, cfdJobStatus, cfdError, onCfdSolve, lastProbe,
 }: Props) {
   const solving = cfdJobStatus === 'running' || cfdJobStatus === 'submitting';
   const portLabel = backendUrl ? backendUrl.replace(/^https?:\/\//, '') : 'offline';
@@ -153,6 +155,17 @@ export function Sidebar({
         <a href="#cfd" className="cfd-sidebar-jump" onClick={onClose}>
           Jump to 3D lab ↓
         </a>
+
+        <div className="cfd-sidebar-probe" aria-live="polite">
+          {lastProbe ? (
+            <>
+              <span className="cfd-sidebar-probe-label">Last probe</span>
+              p {fmtProbe(lastProbe.p)} · |U| {fmtProbe(lastProbe.u)} · T {fmtProbe(lastProbe.t)}
+            </>
+          ) : (
+            <span className="cfd-sidebar-probe-muted">No probe yet · click the 3D surface</span>
+          )}
+        </div>
       </div>
 
       <div className="sidebar-section">

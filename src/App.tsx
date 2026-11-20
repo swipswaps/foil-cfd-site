@@ -10,6 +10,7 @@ import { useBackendProbe } from './hooks/useBackendProbe';
 import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
 import type { SceneContent } from './data/scene';
 import { buildSceneLab, type SceneLab } from './lib/sceneVtp';
+import type { ProbeSample } from './lib/probe';
 
 export type CfdField = 'p' | 'U' | 'T';
 
@@ -56,6 +57,7 @@ export default function App() {
   const [detectedDevice, setDetectedDevice] = useState<DetectedDevice>(detectDevice);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [heroTab, setHeroTab] = useState<'overview' | 'lab'>('overview');
+  const [lastProbe, setLastProbe] = useState<ProbeSample | null>(null);
   const [sceneContent, setSceneContent] = useState<SceneContent>({ kind: 'default', token: 0 });
   const [flow, setFlow] = useState(true);
   const [speed, setSpeed] = useState(2.0);
@@ -234,6 +236,7 @@ export default function App() {
           cfdJobStatus={cfdJobStatus}
           cfdError={cfdError}
           onCfdSolve={startCfdSolve}
+          lastProbe={lastProbe}
         />
         {sidebarOpen && (
           <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
@@ -270,6 +273,7 @@ export default function App() {
                   jobId={backendOnline ? cfdJobId : null}
                   jobStatus={backendOnline ? cfdJobStatus : 'static'}
                   speed={speed}
+                  onProbe={setLastProbe}
                   rotationX={rotationX}
                   rotationY={rotationY}
                   rotationZ={rotationZ}

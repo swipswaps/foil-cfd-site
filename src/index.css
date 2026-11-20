@@ -1490,3 +1490,20 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   font-size: 0.6rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+/* Sidebar: last probe sample */
+.cfd-sidebar-probe {
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  color: #BAE6FD;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.5;
+}
+.cfd-sidebar-probe-label {
+  display: block;
+  color: #5E8FA8;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cfd-sidebar-probe-muted { color: #5E8FA8; font-style: italic; }

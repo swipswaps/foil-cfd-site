@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://swipswaps.github.io/foil-cfd-site').replace(/\/$/, '');
 const HOME = BASE + '/';
@@ -215,8 +215,26 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(probe).toBeVisible();
     await expect(probe.locator('dd')).toHaveCount(3);
     await expect(probe).toContainText(/[−-]?\d+\.\d+/);
+
+    const csvEvt = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    const csv = await csvEvt;
+    expect(csv.suggestedFilename()).toMatch(/^surface-p.*\.csv$/);
+    const csvPath = await csv.path();
+    const firstLine = readFileSync(csvPath!, 'utf8').split('\n')[0];
+    expect(firstLine).toMatch(/^# probe x=-?\d+\.\d+ y=-?\d+\.\d+ z=-?\d+\.\d+ p=.* U=.* T=.*/);
+
+    await page.getByRole('button', { name: /open sidebar/i }).first().click();
+    await expect(page.locator('.app-sidebar').first()).toHaveClass(/open/);
+    const last = page.locator('.cfd-sidebar-probe');
+    await expect(last).toContainText(/Last probe/);
+    await expect(last).toContainText(/\|U\|/);
+    await page.keyboard.press('Escape');
+
     await probe.getByRole('button', { name: /clear probe/i }).click();
     await expect(probe).toHaveCount(0);
+    await page.getByRole('button', { name: /open sidebar/i }).first().click();
+    await expect(page.locator('.cfd-sidebar-probe')).toContainText(/No probe yet/);
   });
 
   test('phone layout stacks without horizontal overflow', async ({ page }) => {

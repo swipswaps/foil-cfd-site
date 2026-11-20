@@ -19,6 +19,7 @@ import vtkDataArray from '@kitware/vtk.js/Common/Core/DataArray';
 import vtkColorTransferFunction from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction';
 import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
 import vtkPointPicker from '@kitware/vtk.js/Rendering/Core/PointPicker';
+import { fmtProbe, type ProbeSample } from '../lib/probe';
 
 interface Props {
   datasetUrl: string;
@@ -26,6 +27,7 @@ interface Props {
   rotationX: number;
   rotationY: number;
   rotationZ: number;
+  onProbe?: (sample: ProbeSample | null) => void;
 }
 
 interface VtkRefs {
@@ -50,15 +52,9 @@ interface VtkDataLike {
   getPointData(): VtkPointDataLike;
 }
 
-interface Probe {
+interface Probe extends ProbeSample {
   left: number;
   top: number;
-  x: number;
-  y: number;
-  z: number;
-  p: number;
-  u: number;
-  t: number;
 }
 
 interface CameraLike {
@@ -107,7 +103,7 @@ function fitOrtho(renderer: RendererLike, mode: 'top' | 'side') {
   renderer.resetCameraClippingRange();
 }
 
-export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ }: Props) {
+export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ, onProbe }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vtkRef = useRef<VtkRefs | null>(null);
   const initFailedRef = useRef(false);
@@ -201,6 +197,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       const vtk = vtkRef.current;
       if (!vtk) return;
       setProbe(null);
+      onProbe?.(null);
       const datasetChanged = datasetRef.current !== datasetUrl;
       datasetRef.current = datasetUrl;
       try {
@@ -259,7 +256,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     };
     load();
     return () => { cancelled = true; };
-  }, [datasetUrl, field]);
+  }, [datasetUrl, field, onProbe]);
 
   useEffect(() => {
     const vtk = vtkRef.current;
@@ -291,13 +288,16 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
   const exportCsv = () => {
     const data = dataRef.current;
     if (!data) return;
+    const n = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : 'na');
     const pts = data.getPoints().getData();
     const pd = data.getPointData();
     const comp = (name: string, tuple: number, component: number) => {
       const arr = pd.getArrayByName(name);
       return arr ? arr.getComponent(tuple, component) : 0;
     };
-    const rows = ['x,y,z,p,Ux,Uy,Uz,T'];
+    const rows = probe
+      ? [`# probe x=${fmtProbe(probe.x, 3)} y=${fmtProbe(probe.y, 3)} z=${fmtProbe(probe.z, 3)} p=${fmtProbe(probe.p)} U=${fmtProbe(probe.u)} T=${fmtProbe(probe.t)}`, 'x,y,z,p,Ux,Uy,Uz,T']
+      : ['x,y,z,p,Ux,Uy,Uz,T'];
     for (let i = 0; i < data.getNumberOfPoints(); i++) {
       rows.push(
         `${pts[i * 3]},${pts[i * 3 + 1]},${pts[i * 3 + 2]},${comp('p', i, 0)},${comp('U', i, 0)},${comp('U', i, 1)},${comp('U', i, 2)},${comp('T', i, 0)}`,
@@ -307,7 +307,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'surface.csv';
+    a.download = probe ? `surface-p${n(probe.p)}-U${n(probe.u)}-T${n(probe.t)}.csv` : 'surface.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -327,6 +327,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     const id = vtk.picker.getPointId();
     if (!Number.isFinite(id) || id < 0) {
       setProbe(null);
+      onProbe?.(null);
       return;
     }
     const pd = data.getPointData();
@@ -338,9 +339,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     const ux = comp('U', id, 0);
     const uy = comp('U', id, 1);
     const uz = comp('U', id, 2);
-    setProbe({
-      left: clientX - rect.left,
-      top: clientY - rect.top,
+    const sample: ProbeSample = {
       x: Number(pts[id * 3]) || 0,
       y: Number(pts[id * 3 + 1]) || 0,
       z: Number(pts[id * 3 + 2]) || 0,
@@ -349,7 +348,9 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
         ? Math.hypot(ux || 0, uy || 0, uz || 0)
         : Number.NaN,
       t: comp('T', id, 0),
-    });
+    };
+    setProbe({ ...sample, left: clientX - rect.left, top: clientY - rect.top });
+    onProbe?.(sample);
   };
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
@@ -364,7 +365,6 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     pickAt(e.clientX, e.clientY);
   };
 
-  const fmt = (v: number, digits = 2) => (Number.isFinite(v) ? v.toFixed(digits) : '—');
 
   const setView = (mode: 'iso' | 'top' | 'side') => {
     const vtk = vtkRef.current;
@@ -440,15 +440,15 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
             <div className="cfd-probe" role="status">
               <div className="cfd-probe-head">
                 <strong>Probe</strong>
-                <button type="button" className="cfd-probe-close" onClick={() => setProbe(null)} aria-label="Clear probe">×</button>
+                <button type="button" className="cfd-probe-close" onClick={() => { setProbe(null); onProbe?.(null); }} aria-label="Clear probe">×</button>
               </div>
               <dl>
-                <dt>p</dt><dd>{fmt(probe.p)}</dd>
-                <dt>U</dt><dd>{fmt(probe.u)}</dd>
-                <dt>T</dt><dd>{fmt(probe.t)}</dd>
+                <dt>p</dt><dd>{fmtProbe(probe.p)}</dd>
+                <dt>U</dt><dd>{fmtProbe(probe.u)}</dd>
+                <dt>T</dt><dd>{fmtProbe(probe.t)}</dd>
               </dl>
               <p className="cfd-probe-coords">
-                ({fmt(probe.x)}, {fmt(probe.y)}, {fmt(probe.z)})
+                ({fmtProbe(probe.x)}, {fmtProbe(probe.y)}, {fmtProbe(probe.z)})
               </p>
             </div>
           </>
