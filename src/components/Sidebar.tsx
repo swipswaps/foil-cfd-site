@@ -1,7 +1,6 @@
 import { DevicePanel, type DevicePick, type DetectedDevice } from './DevicePanel';
 import { ModelUploader } from './ModelUploader';
 import type { SceneContent } from '../data/scene';
-import type { CfdField } from '../App';
 
 interface Props {
   open: boolean;
@@ -27,8 +26,6 @@ interface Props {
   backendUrl: string;
   solverAvailable: boolean;
   onBackendRetry: () => void;
-  cfdField: CfdField;
-  onCfdFieldChange: (f: CfdField) => void;
   cfdJobId: string | null;
   cfdJobStatus: string;
   cfdError: string | null;
@@ -44,7 +41,6 @@ export function Sidebar({
   rotationX, rotationY, rotationZ, onRotationChange, onRotationReset,
   cadStatus, cadUrl, onCadRetry,
   backendUrl, solverAvailable, onBackendRetry,
-  cfdField, onCfdFieldChange,
   cfdJobId, cfdJobStatus, cfdError, onCfdSolve,
 }: Props) {
   const solving = cfdJobStatus === 'running' || cfdJobStatus === 'submitting';
@@ -114,19 +110,6 @@ export function Sidebar({
           <span className="sidebar-section-hint">{portLabel}</span>
         </div>
 
-        <div className="cfd-sidebar-row">
-          <label className="cfd-sidebar-label">Field</label>
-          <select
-            value={cfdField}
-            onChange={(e) => onCfdFieldChange(e.target.value as CfdField)}
-            className="upload-select"
-          >
-            <option value="p">Pressure (p)</option>
-            <option value="U">Velocity (U)</option>
-            <option value="T">Temperature (T)</option>
-          </select>
-        </div>
-
         {backendOnline ? (
           <>
             <button
@@ -154,7 +137,7 @@ export function Sidebar({
           </>
         ) : (
           <div className="flow-approx">
-            Static demo dataset shown. Start the backend for solves:{' '}
+            Static demo · sample wing. Start the backend for live solves:{' '}
             <code>docker compose up --build -d</code>.
             <button
               type="button"

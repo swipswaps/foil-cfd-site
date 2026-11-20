@@ -14,6 +14,10 @@ import vtkGenericRenderWindow from '@kitware/vtk.js/Rendering/Misc/GenericRender
 import vtkXMLPolyDataReader from '@kitware/vtk.js/IO/XML/XMLPolyDataReader';
 import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
+import vtkPolyDataNormals from '@kitware/vtk.js/Filters/Core/PolyDataNormals';
+import vtkDataArray from '@kitware/vtk.js/Common/Core/DataArray';
+import vtkColorTransferFunction from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction';
+import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
 
 interface Props {
   datasetUrl: string;
@@ -23,8 +27,10 @@ interface Props {
 interface VtkRefs {
   view: ReturnType<typeof vtkGenericRenderWindow.newInstance>;
   reader: ReturnType<typeof vtkXMLPolyDataReader.newInstance>;
+  normals: ReturnType<typeof vtkPolyDataNormals.newInstance>;
   mapper: ReturnType<typeof vtkMapper.newInstance>;
   actor: ReturnType<typeof vtkActor.newInstance>;
+  ctf: ReturnType<typeof vtkColorTransferFunction.newInstance>;
   ro?: ResizeObserver;
   added?: boolean;
 }
@@ -51,10 +57,21 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
         view.setContainer(container);
         view.resize();
         const reader = vtkXMLPolyDataReader.newInstance();
+        const normals = vtkPolyDataNormals.newInstance();
+        normals.setInputConnection(reader.getOutputPort());
         const mapper = vtkMapper.newInstance();
         const actor = vtkActor.newInstance();
-        mapper.setInputConnection(reader.getOutputPort());
+        mapper.setInputConnection(normals.getOutputPort());
         actor.setMapper(mapper);
+        const prop = actor.getProperty();
+        prop.setAmbient(0.35);
+        prop.setDiffuse(0.8);
+        prop.setSpecular(0.25);
+        prop.setSpecularPower(12);
+        const ctf = vtkColorTransferFunction.newInstance();
+        const preset = vtkColorMaps.getPresetByName('Cool to Warm');
+        if (preset) ctf.applyColorMap(preset);
+        mapper.setLookupTable(ctf);
         let lastSize = '';
         const ro = new ResizeObserver(() => {
           const cur = vtkRef.current;
@@ -65,7 +82,7 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
           try { cur.view.resize(); cur.view.getRenderWindow().render(); } catch { /* noop */ }
         });
         ro.observe(container);
-        vtkRef.current = { view, reader, mapper, actor, ro };
+        vtkRef.current = { view, reader, normals, mapper, actor, ctf, ro };
         setStatus('Ready — loading dataset…');
       } catch (err) {
         initFailedRef.current = true;
@@ -81,6 +98,8 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
         try { vtk.ro?.disconnect(); } catch { /* noop */ }
         try { vtk.actor.delete(); } catch { /* noop */ }
         try { vtk.mapper.delete(); } catch { /* noop */ }
+        try { vtk.ctf.delete(); } catch { /* noop */ }
+        try { vtk.normals.delete(); } catch { /* noop */ }
         try { vtk.reader.delete(); } catch { /* noop */ }
         try { vtk.view.delete(); } catch { /* noop */ }
         vtkRef.current = null;
@@ -107,10 +126,33 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
         vtk.reader.parseAsArrayBuffer(buf);
         const data = vtk.reader.getOutputData(0);
         if (!data) throw new Error('VTK dataset empty');
-        const names = data.getPointData().getArrays().map((a: { getName: () => string }) => a.getName());
-        if (names.includes(field)) {
+        const pd = data.getPointData();
+        const names = pd.getArrays().map((a: { getName: () => string }) => a.getName());
+        let colorName: string = field;
+        if (field === 'U' && pd.getArrayByName('U')) {
+          const vec = pd.getArrayByName('U');
+          const n = data.getNumberOfPoints();
+          const mag = new Float32Array(n);
+          for (let i = 0; i < n; i++) {
+            const u = vec.getComponent(i, 0) || 0;
+            const v = vec.getComponent(i, 1) || 0;
+            const w = vec.getComponent(i, 2) || 0;
+            mag[i] = Math.hypot(u, v, w);
+          }
+          if (!pd.getArrayByName('Umag')) {
+            pd.addArray(vtkDataArray.newInstance({ name: 'Umag', values: mag, numberOfComponents: 1 }));
+          }
+          colorName = 'Umag';
+        }
+        if (names.includes(field) || colorName !== field) {
+          const arr = pd.getArrayByName(colorName);
+          const range = arr?.getRange?.() ?? [0, 1];
+          const lo = Number.isFinite(range[0]) ? range[0] : 0;
+          const hi = Number.isFinite(range[1]) && range[1] > lo ? range[1] : lo + 1;
+          vtk.ctf.setMappingRange(lo, hi);
+          vtk.mapper.setScalarRange(lo, hi);
           vtk.mapper.setScalarVisibility(true);
-          vtk.mapper.setColorByArrayName(field);
+          vtk.mapper.setColorByArrayName(colorName);
           vtk.mapper.setScalarModeToUsePointFieldData();
         } else {
           vtk.mapper.setScalarVisibility(false);

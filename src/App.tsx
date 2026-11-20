@@ -184,8 +184,6 @@ export default function App() {
           backendUrl={backend.backendOrigin}
           solverAvailable={backend.solverAvailable}
           onBackendRetry={backend.probe}
-          cfdField={cfdField}
-          onCfdFieldChange={setCfdField}
           cfdJobId={cfdJobId}
           cfdJobStatus={cfdJobStatus}
           cfdError={cfdError}
@@ -213,8 +211,10 @@ export default function App() {
           <Suspense fallback={<CfdLabSkeleton />}>
             <CfdLab
               backendUrl={backend.backendOrigin}
+              backendOnline={backendOnline}
               solverAvailable={backendOnline && backend.solverAvailable}
               field={cfdField}
+              onFieldChange={setCfdField}
               datasetUrl={labDatasetUrl}
               jobId={backendOnline ? cfdJobId : null}
               jobStatus={backendOnline ? cfdJobStatus : 'static'}

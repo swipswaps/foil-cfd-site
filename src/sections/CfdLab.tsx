@@ -11,8 +11,10 @@ const CpPolarChart = lazy(() =>
 
 interface Props {
   backendUrl: string;
+  backendOnline: boolean;
   solverAvailable: boolean;
   field: CfdField;
+  onFieldChange: (field: CfdField) => void;
   datasetUrl: string;
   jobId: string | null;
   jobStatus: string;
@@ -23,7 +25,8 @@ const FieldSkeleton = ({ label }: { label: string }) => (
 );
 
 export function CfdLab({
-  backendUrl, solverAvailable, field, datasetUrl, jobId, jobStatus,
+  backendUrl, backendOnline, solverAvailable, field, onFieldChange,
+  datasetUrl, jobId, jobStatus,
 }: Props) {
   return (
     <section id="cfd" className="cfd-lab">
@@ -31,11 +34,23 @@ export function CfdLab({
         <h2>CFD Laboratory</h2>
         <div className="cfd-lab-status">
           <span>
-            {solverAvailable ? 'OpenFOAM ready' : 'Solver unavailable · showing default mesh'}
+            {backendOnline
+              ? solverAvailable
+                ? 'OpenFOAM ready'
+                : 'Solver unavailable · sample mesh'
+              : 'Static demo · sample wing'}
           </span>
-          <span className="cfd-lab-hint">
-            Controls in the sidebar
-          </span>
+          <label className="cfd-lab-field">
+            Field
+            <select
+              value={field}
+              onChange={(e) => onFieldChange(e.target.value as CfdField)}
+            >
+              <option value="p">Pressure (p)</option>
+              <option value="U">Velocity (U)</option>
+              <option value="T">Temperature (T)</option>
+            </select>
+          </label>
         </div>
       </header>
       {jobId && (
@@ -52,7 +67,11 @@ export function CfdLab({
         </Suspense>
       </div>
       <p className="cfd-lab-credit">
-        Viewing <code>{datasetUrl.replace(backendUrl, '')}</code>
+        {backendOnline ? (
+          <>Viewing <code>{datasetUrl.replace(backendUrl, '')}</code></>
+        ) : (
+          <>Static demo · sample wing</>
+        )}
       </p>
     </section>
   );

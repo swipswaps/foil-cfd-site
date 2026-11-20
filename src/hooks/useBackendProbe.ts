@@ -82,9 +82,7 @@ export function useBackendProbe() {
     return {
       status: 'offline',
       backendOrigin: '',
-      reason: isHttps
-        ? 'no localhost backend — run: docker compose up -d'
-        : 'backend unreachable — run: docker compose up -d',
+      reason: 'solver not connected',
       mode: 'static',
       solverAvailable: false,
     };

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { writeFileSync } from 'node:fs';
 
 const BASE = (process.env.PLAYWRIGHT_BASE_URL || 'https://swipswaps.github.io/foil-cfd-site').replace(/\/$/, '');
 const HOME = BASE + '/';
@@ -12,15 +13,12 @@ const BENIGN = new RegExp([
   /WebGL/i,
 ].map(r => r.source).join('|'));
 
-async function openSidebar(page) {
-  const burger = page.getByRole('button', { name: /open sidebar/i }).first();
-  if (await burger.count()) {
-    await burger.scrollIntoViewIfNeeded().catch(() => {});
-    await page.waitForTimeout(300);
-    await burger.click();
-  }
-  await expect(page.locator('.app-sidebar').first()).toHaveClass(/open/, { timeout: 5000 });
-}
+const roundBox = (box: { x: number; y: number; width: number; height: number }) => ({
+  x: Math.max(0, Math.round(box.x)),
+  y: Math.max(0, Math.round(box.y)),
+  width: Math.max(1, Math.round(box.width)),
+  height: Math.max(1, Math.round(box.height)),
+});
 
 async function waitForLab(page) {
   await page.locator('#cfd').scrollIntoViewIfNeeded();
@@ -29,6 +27,11 @@ async function waitForLab(page) {
   await expect(canvas).toBeVisible({ timeout: 20000 });
   await expect(page.locator('.cfd-vtk-head')).toContainText(/\d+ pts/, { timeout: 20000 });
   return canvas;
+}
+
+async function centerCanvas(page) {
+  await page.locator('.cfd-vtk-canvas').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(400);
 }
 
 async function nonBackgroundFraction(page, buffer: Buffer) {
@@ -56,6 +59,15 @@ async function nonBackgroundFraction(page, buffer: Buffer) {
 }
 
 test.describe('3D lab UX (static, no backend)', () => {
+  test('hero CTA opens the lab', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    const cta = page.getByRole('link', { name: /Open 3D CFD Lab/i }).first();
+    await expect(cta).toBeVisible({ timeout: 15000 });
+    await cta.click();
+    await expect(page.locator('#cfd')).toBeInViewport({ timeout: 5000 });
+  });
+
   test('renders, orbits, recolours, charts data, and is responsive', async ({ page }) => {
     test.setTimeout(240_000);
     const errs: string[] = [];
@@ -72,9 +84,10 @@ test.describe('3D lab UX (static, no backend)', () => {
     );
 
     const canvas = await waitForLab(page);
-    const readyMs = Date.now() - t0;
-    expect(readyMs).toBeLessThan(25000);
+    expect(Date.now() - t0).toBeLessThan(25000);
     await expect(page.locator('.cfd-vtk-head')).toContainText(/\d+ pts · \d+ cells/);
+    await expect(page.locator('#cfd').getByText(/Static demo · sample wing/i).first()).toBeVisible();
+    expect(await page.getByRole('button', { name: /Generate synthetic preview|Run simpleFoam/i }).count()).toBe(0);
 
     const canvasBox = await canvas.boundingBox();
     const chartBox = await page.locator('.cfd-chart').first().boundingBox();
@@ -88,25 +101,18 @@ test.describe('3D lab UX (static, no backend)', () => {
         chartBox!.y + chartBox!.height <= canvasBox!.y);
     expect(overlap).toBe(false);
 
-    const roundBox = (box: { x: number; y: number; width: number; height: number }) => ({
-      x: Math.max(0, Math.round(box.x)),
-      y: Math.max(0, Math.round(box.y)),
-      width: Math.max(1, Math.round(box.width)),
-      height: Math.max(1, Math.round(box.height)),
-    });
+    await centerCanvas(page);
+    const b1 = roundBox((await canvas.boundingBox())!);
+    const before = await page.screenshot({ clip: b1 });
+    writeFileSync('test-results/foil-ux-lab.png', before);
+    expect(await nonBackgroundFraction(page, before)).toBeGreaterThan(0.01);
 
-    const before = await page.screenshot({ clip: roundBox(canvasBox!) });
-    const frac = await nonBackgroundFraction(page, before);
-    expect(frac).toBeGreaterThan(0.01);
-
-    const b = canvasBox!;
-    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.move(b1.x + b1.width / 2, b1.y + b1.height / 2);
     await page.mouse.down();
-    await page.mouse.move(b.x + b.width / 2 + 140, b.y + b.height / 2 + 50, { steps: 12 });
+    await page.mouse.move(b1.x + b1.width / 2 + 140, b1.y + b1.height / 2 + 50, { steps: 12 });
     await page.mouse.up();
     await page.waitForTimeout(800);
-    await page.locator('#cfd').scrollIntoViewIfNeeded();
-    await page.waitForTimeout(400);
+    await centerCanvas(page);
     const b2 = roundBox((await canvas.boundingBox())!);
     const afterOrbit = await page.screenshot({ clip: b2 });
     expect(afterOrbit.equals(before)).toBe(false);
@@ -123,28 +129,24 @@ test.describe('3D lab UX (static, no backend)', () => {
     expect(plotData.map((t) => t.name).join(',')).toMatch(/Upper/);
 
     const beforeField = await page.screenshot({ clip: b2 });
-    await openSidebar(page);
-    await expect(page.getByText(/Static demo dataset shown/i)).toBeVisible();
-    expect(await page.getByRole('button', { name: /Generate synthetic preview|Run simpleFoam/i }).count()).toBe(0);
-
-    const field = page.locator('.cfd-sidebar-row select').first();
+    const field = page.locator('.cfd-lab-head select').first();
     await expect(field).toBeVisible();
     await field.selectOption('T');
-    await expect(page.getByRole('link', { name: /Jump to 3D lab/i })).toHaveCount(1);
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.app-sidebar').first()).not.toHaveClass(/open/, { timeout: 5000 });
-    await page.locator('#cfd').scrollIntoViewIfNeeded();
     await expect(page.locator('.cfd-vtk-head')).toContainText(/field=T/, { timeout: 20000 });
     await page.waitForTimeout(800);
-    await page.locator('#cfd').scrollIntoViewIfNeeded();
-    await page.waitForTimeout(400);
+    await centerCanvas(page);
     const b3 = roundBox((await canvas.boundingBox())!);
     const afterField = await page.screenshot({ clip: b3 });
     expect(afterField.equals(beforeField)).toBe(false);
-    await page.screenshot({ clip: b3, path: 'test-results/foil-ux-lab.png' });
 
+    expect(errs.filter(e => !BENIGN.test(e))).toEqual([]);
+  });
+
+  test('phone layout stacks without horizontal overflow', async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(HOME, { waitUntil: 'load' });
+    await page.locator('#cfd').scrollIntoViewIfNeeded();
     await expect(page.locator('.cfd-vtk-canvas canvas').first()).toBeVisible({ timeout: 20000 });
     const scrollW = await page.evaluate(() => document.documentElement.scrollWidth);
     const innerW = await page.evaluate(() => window.innerWidth);
@@ -160,7 +162,5 @@ test.describe('3D lab UX (static, no backend)', () => {
           chBox.y + chBox.height <= cBox.y);
       expect(overlapMobile).toBe(false);
     }
-
-    expect(errs.filter(e => !BENIGN.test(e))).toEqual([]);
   });
 });
