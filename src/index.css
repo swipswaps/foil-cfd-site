@@ -1329,3 +1329,22 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
   font-size: 0.85rem;
   text-align: center;
 }
+
+/* Lazy mount + provenance + keyboard focus */
+.lazy-mount { scroll-margin-top: 72px; }
+.cfd-lab-skeleton {
+  min-height: 420px;
+  border-radius: 10px;
+  border: 1px dashed #16324F;
+  background: #06121A;
+}
+.cfd-lab-provenance {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  color: #5E8FA8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.cfd-vtk-canvas:focus-visible {
+  outline: 2px solid #38BDF8;
+  outline-offset: 2px;
+}

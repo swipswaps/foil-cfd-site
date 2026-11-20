@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
   try {
@@ -22,6 +22,9 @@ import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/C
 interface Props {
   datasetUrl: string;
   field: 'p' | 'U' | 'T';
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
 }
 
 interface VtkRefs {
@@ -45,7 +48,7 @@ interface VtkDataLike {
   getPointData(): VtkPointDataLike;
 }
 
-export function CfdVtkViewer({ datasetUrl, field }: Props) {
+export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vtkRef = useRef<VtkRefs | null>(null);
   const initFailedRef = useRef(false);
@@ -188,6 +191,17 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
     return () => { cancelled = true; };
   }, [datasetUrl, field]);
 
+  useEffect(() => {
+    const vtk = vtkRef.current;
+    if (!vtk) return;
+    vtk.actor.setOrientation(
+      (rotationX * 180) / Math.PI,
+      (rotationY * 180) / Math.PI,
+      (rotationZ * 180) / Math.PI,
+    );
+    vtk.view.getRenderWindow().render();
+  }, [rotationX, rotationY, rotationZ]);
+
   const exportVtp = async () => {
     try {
       const res = await fetch(datasetUrl);
@@ -254,6 +268,29 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
     vtk.view.getRenderWindow().render();
   };
 
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const vtk = vtkRef.current;
+    if (!vtk) return;
+    const renderer = vtk.view.getRenderer();
+    const cam = renderer.getActiveCamera();
+    let handled = true;
+    switch (e.key) {
+      case 'ArrowLeft': cam.azimuth(-5); break;
+      case 'ArrowRight': cam.azimuth(5); break;
+      case 'ArrowUp': cam.elevation(5); break;
+      case 'ArrowDown': cam.elevation(-5); break;
+      case '+': case '=': cam.zoom(1.1); break;
+      case '-': case '_': cam.zoom(0.9); break;
+      case 'r': case 'R': renderer.resetCamera(); break;
+      default: handled = false;
+    }
+    if (handled) {
+      e.preventDefault();
+      renderer.resetCameraClippingRange();
+      vtk.view.getRenderWindow().render();
+    }
+  };
+
   return (
     <section className="cfd-vtk">
       <header className="cfd-vtk-head">
@@ -279,7 +316,14 @@ export function CfdVtkViewer({ datasetUrl, field }: Props) {
           <button type="button" onClick={exportCsv}>Export CSV</button>
         </div>
       </header>
-      <div ref={containerRef} className="cfd-vtk-canvas" />
+      <div
+        ref={containerRef}
+        className="cfd-vtk-canvas"
+        role="img"
+        aria-label={`3D CFD surface, ${field.toUpperCase()} field`}
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+      />
     </section>
   );
 }

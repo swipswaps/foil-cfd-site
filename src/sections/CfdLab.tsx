@@ -18,6 +18,10 @@ interface Props {
   sceneLabel: string;
   cp?: { upper: CpPoint[]; lower: CpPoint[] };
   chartNote?: string;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
+  provenance: string;
   datasetUrl: string;
   jobId: string | null;
   jobStatus: string;
@@ -29,10 +33,10 @@ const FieldSkeleton = ({ label }: { label: string }) => (
 
 export function CfdLab({
   backendOnline, solverAvailable, field, onFieldChange,
-  sceneLabel, cp, chartNote, datasetUrl, jobId, jobStatus,
+  sceneLabel, cp, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus,
 }: Props) {
   return (
-    <section id="cfd" className="cfd-lab">
+    <section className="cfd-lab">
       <header className="cfd-lab-head">
         <h2>CFD Laboratory</h2>
         <div className="cfd-lab-status">
@@ -62,7 +66,7 @@ export function CfdLab({
       <div className="cfd-lab-grid">
         <CfdVtkBoundary>
           <Suspense fallback={<FieldSkeleton label="VTK viewer" />}>
-            <CfdVtkViewer datasetUrl={datasetUrl} field={field} />
+            <CfdVtkViewer datasetUrl={datasetUrl} field={field} rotationX={rotationX} rotationY={rotationY} rotationZ={rotationZ} />
           </Suspense>
         </CfdVtkBoundary>
         {cp ? (
@@ -81,6 +85,7 @@ export function CfdLab({
         {sceneLabel}
         {backendOnline ? '' : ' · static demo'}
       </p>
+      <p className="cfd-lab-provenance">{provenance}</p>
     </section>
   );
 }

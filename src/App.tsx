@@ -10,6 +10,7 @@ import { useBackendProbe } from './hooks/useBackendProbe';
 import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
 import type { SceneContent } from './data/scene';
 import { buildSceneLab, type SceneLab } from './lib/sceneVtp';
+import { LazyMount } from './components/LazyMount';
 
 export type CfdField = 'p' | 'U' | 'T';
 
@@ -166,6 +167,11 @@ export default function App() {
   const backendOnline = backend.status === 'online' && !!backend.backendOrigin;
   const labDatasetUrl = sceneLab?.url ?? (backendOnline && datasetUrl ? datasetUrl : STATIC_DEMO_DATASET);
   const labLabel = sceneLab?.label ?? (backendOnline ? 'Backend dataset' : 'Sample wing');
+  const provenance = sceneLab
+    ? `${sceneLab.kind === 'model' ? 'Uploaded model' : 'NACA'} · generated ${new Date(sceneLab.generatedAt).toLocaleString()}`
+    : backendOnline
+      ? `Backend · ${cfdJobId ? `job ${cfdJobId.slice(0, 8)}` : 'default dataset'}`
+      : 'Static demo · bundled sample';
 
   return (
     <div className="app-shell">
@@ -222,7 +228,8 @@ export default function App() {
             rotationY={rotationY}
             rotationZ={rotationZ}
           />
-          <Suspense fallback={<CfdLabSkeleton />}>
+          <LazyMount id="cfd">
+            <Suspense fallback={<CfdLabSkeleton />}>
             <CfdLab
               backendOnline={backendOnline}
               solverAvailable={backendOnline && backend.solverAvailable}
@@ -234,8 +241,13 @@ export default function App() {
               datasetUrl={labDatasetUrl}
               jobId={backendOnline ? cfdJobId : null}
               jobStatus={backendOnline ? cfdJobStatus : 'static'}
+              rotationX={rotationX}
+              rotationY={rotationY}
+              rotationZ={rotationZ}
+              provenance={provenance}
             />
-          </Suspense>
+            </Suspense>
+          </LazyMount>
           <ReadmeSection />
           <ProjectShowcase />
           <footer className="footer">

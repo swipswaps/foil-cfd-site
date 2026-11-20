@@ -11,6 +11,7 @@ export interface SceneLab {
   label: string;
   kind: 'naca' | 'model';
   cp?: { upper: CpPoint[]; lower: CpPoint[] };
+  generatedAt: string;
   revoke: () => void;
 }
 
@@ -120,7 +121,7 @@ function buildNaca(code: string): SceneLab {
   }
   const blob = new Blob([vtpXml(points, polys, pv, uv, tv)], { type: 'application/xml' });
   const url = URL.createObjectURL(blob);
-  return { url, label: `NACA ${code}`, kind: 'naca', cp, revoke: () => URL.revokeObjectURL(url) };
+  return { url, label: `NACA ${code}`, kind: 'naca', cp, generatedAt: new Date().toISOString(), revoke: () => URL.revokeObjectURL(url) };
 }
 
 function buildModel(object: THREE.Object3D, filename: string): SceneLab {
@@ -167,7 +168,7 @@ function buildModel(object: THREE.Object3D, filename: string): SceneLab {
   const blob = new Blob([vtpXml(points, tris, pv, uv, tv)], { type: 'application/xml' });
   const capped = triCount >= MAX_MODEL_TRIS ? ' (subset)' : '';
   const url = URL.createObjectURL(blob);
-  return { url, label: `${filename}${capped}`, kind: 'model', revoke: () => URL.revokeObjectURL(url) };
+  return { url, label: `${filename}${capped}`, kind: 'model', generatedAt: new Date().toISOString(), revoke: () => URL.revokeObjectURL(url) };
 }
 
 export function buildSceneLab(scene: SceneContent): SceneLab | null {
