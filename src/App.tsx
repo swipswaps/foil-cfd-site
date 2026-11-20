@@ -12,6 +12,8 @@ import type { SceneContent } from './data/scene';
 
 export type CfdField = 'p' | 'U' | 'T';
 
+const STATIC_DEMO_DATASET = `${import.meta.env.BASE_URL}demo/surface.vtp`;
+
 const CfdLab = lazy(() =>
   import('./sections/CfdLab').then((m) => ({ default: m.CfdLab }))
 );
@@ -149,6 +151,7 @@ export default function App() {
   const resetRotation = () => { setRotationX(0); setRotationY(0); setRotationZ(0); };
 
   const backendOnline = backend.status === 'online' && !!backend.backendOrigin;
+  const labDatasetUrl = backendOnline && datasetUrl ? datasetUrl : STATIC_DEMO_DATASET;
 
   return (
     <div className="app-shell">
@@ -207,18 +210,16 @@ export default function App() {
             rotationY={rotationY}
             rotationZ={rotationZ}
           />
-          {backendOnline && datasetUrl && (
-            <Suspense fallback={<CfdLabSkeleton />}>
-              <CfdLab
-                backendUrl={backend.backendOrigin}
-                solverAvailable={backend.solverAvailable}
-                field={cfdField}
-                datasetUrl={datasetUrl}
-                jobId={cfdJobId}
-                jobStatus={cfdJobStatus}
-              />
-            </Suspense>
-          )}
+          <Suspense fallback={<CfdLabSkeleton />}>
+            <CfdLab
+              backendUrl={backend.backendOrigin}
+              solverAvailable={backendOnline && backend.solverAvailable}
+              field={cfdField}
+              datasetUrl={labDatasetUrl}
+              jobId={backendOnline ? cfdJobId : null}
+              jobStatus={backendOnline ? cfdJobStatus : 'static'}
+            />
+          </Suspense>
           <ReadmeSection />
           <ProjectShowcase />
           <footer className="footer">

@@ -114,21 +114,21 @@ export function Sidebar({
           <span className="sidebar-section-hint">{portLabel}</span>
         </div>
 
+        <div className="cfd-sidebar-row">
+          <label className="cfd-sidebar-label">Field</label>
+          <select
+            value={cfdField}
+            onChange={(e) => onCfdFieldChange(e.target.value as CfdField)}
+            className="upload-select"
+          >
+            <option value="p">Pressure (p)</option>
+            <option value="U">Velocity (U)</option>
+            <option value="T">Temperature (T)</option>
+          </select>
+        </div>
+
         {backendOnline ? (
           <>
-            <div className="cfd-sidebar-row">
-              <label className="cfd-sidebar-label">Field</label>
-              <select
-                value={cfdField}
-                onChange={(e) => onCfdFieldChange(e.target.value as CfdField)}
-                className="upload-select"
-              >
-                <option value="p">Pressure (p)</option>
-                <option value="U">Velocity (U)</option>
-                <option value="T">Temperature (T)</option>
-              </select>
-            </div>
-
             <button
               type="button"
               onClick={onCfdSolve}
@@ -151,14 +151,11 @@ export function Sidebar({
             )}
 
             {cfdError && <div className="upload-error">{cfdError}</div>}
-
-            <a href="#cfd" className="cfd-sidebar-jump" onClick={onClose}>
-              Jump to 3D lab ↓
-            </a>
           </>
         ) : (
           <div className="flow-approx">
-            Backend offline. Start with <code>docker compose up --build -d</code>.
+            Static demo dataset shown. Start the backend for solves:{' '}
+            <code>docker compose up --build -d</code>.
             <button
               type="button"
               onClick={onBackendRetry}
@@ -169,6 +166,10 @@ export function Sidebar({
             </button>
           </div>
         )}
+
+        <a href="#cfd" className="cfd-sidebar-jump" onClick={onClose}>
+          Jump to 3D lab ↓
+        </a>
       </div>
 
       <div className="sidebar-section">

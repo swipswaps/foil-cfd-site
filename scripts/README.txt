@@ -12,6 +12,10 @@ test_cfd_tools.sh
     Default base: http://127.0.0.1:8002. Exits non-zero on any failed check.
     Normalizes curl's 000 and allows 30 s for the cold PyVista import.
 
+make_demo_vtp.py
+    Generates public/demo/surface.vtp (static 3D wing, 246 pts / 320 polys)
+    for the backend-less CFD lab. Stdlib only; reproducible.
+
 One-shot repairs (not maintained here)
 --------------------------------------
 Repair and migration scripts that depend on machine-local inputs (for example
