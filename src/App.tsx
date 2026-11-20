@@ -269,6 +269,7 @@ export default function App() {
                   datasetUrl={labDatasetUrl}
                   jobId={backendOnline ? cfdJobId : null}
                   jobStatus={backendOnline ? cfdJobStatus : 'static'}
+                  speed={speed}
                   rotationX={rotationX}
                   rotationY={rotationY}
                   rotationZ={rotationZ}

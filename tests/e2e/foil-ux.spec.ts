@@ -185,6 +185,40 @@ test.describe('3D lab UX (static, no backend)', () => {
     expect(errs.filter(e => !BENIGN.test(e))).toEqual([]);
   });
 
+  test('lab header shows free-stream conditions and the surface probes p/U/T', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    await waitForLab(page);
+
+    const fs = page.locator('.cfd-lab-freestream');
+    await expect(fs).toBeVisible();
+    await expect(fs).toContainText(/U∞/);
+    await expect(fs).toContainText(/Re\s*[\d.]+×10/);
+    await expect(fs).toContainText(/q∞\s*\d+\s*Pa/);
+    await expect(fs).toContainText(/T∞\s*\d+\s*K/);
+
+    await centerCanvas(page);
+    const canvas = page.locator('.cfd-vtk-surface canvas').first();
+    const box = (await canvas.boundingBox())!;
+    const spots: [number, number][] = [
+      [0.5, 0.5], [0.5, 0.4], [0.45, 0.55], [0.55, 0.45],
+      [0.6, 0.5], [0.4, 0.5], [0.5, 0.6],
+    ];
+    for (const [fx, fy] of spots) {
+      await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+      if (await page.locator('.cfd-probe').count()) break;
+      await page.waitForTimeout(150);
+    }
+
+    const probe = page.locator('.cfd-probe');
+    await expect(probe).toBeVisible();
+    await expect(probe.locator('dd')).toHaveCount(3);
+    await expect(probe).toContainText(/[−-]?\d+\.\d+/);
+    await probe.getByRole('button', { name: /clear probe/i }).click();
+    await expect(probe).toHaveCount(0);
+  });
+
   test('phone layout stacks without horizontal overflow', async ({ page }) => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 375, height: 812 });

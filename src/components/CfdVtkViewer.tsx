@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
   try {
@@ -18,6 +18,7 @@ import vtkPolyDataNormals from '@kitware/vtk.js/Filters/Core/PolyDataNormals';
 import vtkDataArray from '@kitware/vtk.js/Common/Core/DataArray';
 import vtkColorTransferFunction from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction';
 import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
+import vtkPointPicker from '@kitware/vtk.js/Rendering/Core/PointPicker';
 
 interface Props {
   datasetUrl: string;
@@ -34,6 +35,7 @@ interface VtkRefs {
   mapper: ReturnType<typeof vtkMapper.newInstance>;
   actor: ReturnType<typeof vtkActor.newInstance>;
   ctf: ReturnType<typeof vtkColorTransferFunction.newInstance>;
+  picker: ReturnType<typeof vtkPointPicker.newInstance>;
   ro?: ResizeObserver;
   added?: boolean;
 }
@@ -48,13 +50,73 @@ interface VtkDataLike {
   getPointData(): VtkPointDataLike;
 }
 
+interface Probe {
+  left: number;
+  top: number;
+  x: number;
+  y: number;
+  z: number;
+  p: number;
+  u: number;
+  t: number;
+}
+
+interface CameraLike {
+  setFocalPoint(x: number, y: number, z: number): void;
+  setPosition(x: number, y: number, z: number): void;
+  setViewUp(x: number, y: number, z: number): void;
+}
+
+interface RendererLike {
+  computeVisiblePropBounds(): number[];
+  getActiveCamera(): CameraLike;
+  resetCameraClippingRange(): void;
+}
+
+function bounds(renderer: RendererLike) {
+  const b = renderer.computeVisiblePropBounds();
+  return {
+    cx: (b[0] + b[1]) / 2,
+    cy: (b[2] + b[3]) / 2,
+    cz: (b[4] + b[5]) / 2,
+    size: Math.max(b[1] - b[0], b[3] - b[2], b[5] - b[4]) * 2 || 4,
+  };
+}
+
+function fitIso(renderer: RendererLike) {
+  const { cx, cy, cz, size } = bounds(renderer);
+  const cam = renderer.getActiveCamera();
+  const offset = size * 0.8;
+  cam.setFocalPoint(cx, cy, cz);
+  cam.setPosition(cx + offset, cy - offset, cz + offset);
+  cam.setViewUp(0, 0, 1);
+  renderer.resetCameraClippingRange();
+}
+
+function fitOrtho(renderer: RendererLike, mode: 'top' | 'side') {
+  const { cx, cy, cz, size } = bounds(renderer);
+  const cam = renderer.getActiveCamera();
+  cam.setFocalPoint(cx, cy, cz);
+  if (mode === 'top') {
+    cam.setPosition(cx, cy + size, cz);
+    cam.setViewUp(0, 0, -1);
+  } else {
+    cam.setPosition(cx + size, cy, cz);
+    cam.setViewUp(0, 1, 0);
+  }
+  renderer.resetCameraClippingRange();
+}
+
 export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vtkRef = useRef<VtkRefs | null>(null);
   const initFailedRef = useRef(false);
   const dataRef = useRef<VtkDataLike | null>(null);
+  const datasetRef = useRef<string | null>(null);
   const [status, setStatus] = useState('Waiting for layout…');
   const [legend, setLegend] = useState<{ name: string; lo: number; hi: number } | null>(null);
+  const [probe, setProbe] = useState<Probe | null>(null);
+  const downRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -87,6 +149,10 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
         const preset = vtkColorMaps.getPresetByName('Cool to Warm');
         if (preset) ctf.applyColorMap(preset);
         mapper.setLookupTable(ctf);
+        const picker = vtkPointPicker.newInstance();
+        picker.setPickFromList(true);
+        picker.initializePickList();
+        picker.addPickList(actor);
         let lastSize = '';
         const ro = new ResizeObserver(() => {
           const cur = vtkRef.current;
@@ -97,7 +163,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
           try { cur.view.resize(); cur.view.getRenderWindow().render(); } catch { /* noop */ }
         });
         ro.observe(container);
-        vtkRef.current = { view, reader, normals, mapper, actor, ctf, ro };
+        vtkRef.current = { view, reader, normals, mapper, actor, ctf, picker, ro };
         setStatus('Ready — loading dataset…');
       } catch (err) {
         initFailedRef.current = true;
@@ -114,6 +180,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
         try { vtk.actor.delete(); } catch { /* noop */ }
         try { vtk.mapper.delete(); } catch { /* noop */ }
         try { vtk.ctf.delete(); } catch { /* noop */ }
+        try { vtk.picker.delete(); } catch { /* noop */ }
         try { vtk.normals.delete(); } catch { /* noop */ }
         try { vtk.reader.delete(); } catch { /* noop */ }
         try { vtk.view.delete(); } catch { /* noop */ }
@@ -133,6 +200,9 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       if (cancelled || initFailedRef.current) return;
       const vtk = vtkRef.current;
       if (!vtk) return;
+      setProbe(null);
+      const datasetChanged = datasetRef.current !== datasetUrl;
+      datasetRef.current = datasetUrl;
       try {
         const res = await fetch(datasetUrl, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -180,7 +250,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
           vtk.view.getRenderer().addActor(vtk.actor);
           vtk.added = true;
         }
-        vtk.view.getRenderer().resetCamera();
+        if (datasetChanged) fitIso(vtk.view.getRenderer() as unknown as RendererLike);
         vtk.view.getRenderWindow().render();
         setStatus(`${data.getNumberOfPoints()} pts · ${data.getNumberOfCells()} cells · field=${field}`);
       } catch (err) {
@@ -242,38 +312,66 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     URL.revokeObjectURL(url);
   };
 
+  const pickAt = (clientX: number, clientY: number) => {
+    const vtk = vtkRef.current;
+    const data = dataRef.current;
+    const surface = containerRef.current;
+    if (!vtk || !data || !surface) return;
+    const rect = surface.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const views = (vtk.view.getRenderWindow() as unknown as { getViews?: () => { getFramebufferSize?: () => number[] }[] }).getViews?.();
+    const fb = views?.[0]?.getFramebufferSize?.() ?? [rect.width, rect.height];
+    const x = ((clientX - rect.left) / rect.width) * fb[0];
+    const y = ((rect.bottom - clientY) / rect.height) * fb[1];
+    vtk.picker.pick([x, y, 0], vtk.view.getRenderer());
+    const id = vtk.picker.getPointId();
+    if (!Number.isFinite(id) || id < 0) {
+      setProbe(null);
+      return;
+    }
+    const pd = data.getPointData();
+    const pts = data.getPoints().getData();
+    const comp = (name: string, tuple: number, component: number) => {
+      const arr = pd.getArrayByName(name);
+      return arr ? arr.getComponent(tuple, component) : Number.NaN;
+    };
+    const ux = comp('U', id, 0);
+    const uy = comp('U', id, 1);
+    const uz = comp('U', id, 2);
+    setProbe({
+      left: clientX - rect.left,
+      top: clientY - rect.top,
+      x: Number(pts[id * 3]) || 0,
+      y: Number(pts[id * 3 + 1]) || 0,
+      z: Number(pts[id * 3 + 2]) || 0,
+      p: comp('p', id, 0),
+      u: Number.isFinite(ux) || Number.isFinite(uy) || Number.isFinite(uz)
+        ? Math.hypot(ux || 0, uy || 0, uz || 0)
+        : Number.NaN,
+      t: comp('T', id, 0),
+    });
+  };
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    downRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    const down = downRef.current;
+    downRef.current = null;
+    if (!down) return;
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+    pickAt(e.clientX, e.clientY);
+  };
+
+  const fmt = (v: number, digits = 2) => (Number.isFinite(v) ? v.toFixed(digits) : '—');
+
   const setView = (mode: 'iso' | 'top' | 'side') => {
     const vtk = vtkRef.current;
     if (!vtk) return;
-    const renderer = vtk.view.getRenderer();
-    if (mode === 'iso') {
-      const b = renderer.computeVisiblePropBounds();
-      const cx = (b[0] + b[1]) / 2;
-      const cy = (b[2] + b[3]) / 2;
-      const cz = (b[4] + b[5]) / 2;
-      const dist = Math.max(b[1] - b[0], b[3] - b[2], b[5] - b[4]) * 2 || 4;
-      const cam = renderer.getActiveCamera();
-      cam.setFocalPoint(cx, cy, cz);
-      cam.setPosition(cx + dist, cy - dist, cz + dist);
-      cam.setViewUp(0, 0, 1);
-      renderer.resetCameraClippingRange();
-    } else {
-      const b = renderer.computeVisiblePropBounds();
-      const cx = (b[0] + b[1]) / 2;
-      const cy = (b[2] + b[3]) / 2;
-      const cz = (b[4] + b[5]) / 2;
-      const dist = Math.max(b[1] - b[0], b[3] - b[2], b[5] - b[4]) * 2 || 4;
-      const cam = renderer.getActiveCamera();
-      cam.setFocalPoint(cx, cy, cz);
-      if (mode === 'top') {
-        cam.setPosition(cx, cy + dist, cz);
-        cam.setViewUp(0, 0, -1);
-      } else {
-        cam.setPosition(cx + dist, cy, cz);
-        cam.setViewUp(0, 1, 0);
-      }
-      renderer.resetCameraClippingRange();
-    }
+    const renderer = vtk.view.getRenderer() as unknown as RendererLike;
+    if (mode === 'iso') fitIso(renderer);
+    else fitOrtho(renderer, mode);
     vtk.view.getRenderWindow().render();
   };
 
@@ -290,7 +388,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       case 'ArrowDown': cam.elevation(-5); break;
       case '+': case '=': cam.zoom(1.1); break;
       case '-': case '_': cam.zoom(0.9); break;
-      case 'r': case 'R': renderer.resetCamera(); break;
+      case 'r': case 'R': fitIso(renderer as unknown as RendererLike); break;
       default: handled = false;
     }
     if (handled) {
@@ -323,16 +421,39 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
           <button type="button" onClick={() => setView('side')}>Side</button>
           <button type="button" onClick={exportVtp}>Export VTP</button>
           <button type="button" onClick={exportCsv}>Export CSV</button>
+          <span className="cfd-vtk-hint">Click surface to probe</span>
         </div>
       </header>
       <div
-        ref={containerRef}
         className="cfd-vtk-canvas"
         role="img"
-        aria-label={`3D CFD surface, ${field.toUpperCase()} field`}
+        aria-label={`3D CFD surface, ${field.toUpperCase()} field. Click the surface to sample p, U and T.`}
         tabIndex={0}
         onKeyDown={onKeyDown}
-      />
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+      >
+        <div ref={containerRef} className="cfd-vtk-surface" />
+        {probe && (
+          <>
+            <span className="cfd-probe-dot" style={{ left: probe.left, top: probe.top }} aria-hidden="true" />
+            <div className="cfd-probe" role="status">
+              <div className="cfd-probe-head">
+                <strong>Probe</strong>
+                <button type="button" className="cfd-probe-close" onClick={() => setProbe(null)} aria-label="Clear probe">×</button>
+              </div>
+              <dl>
+                <dt>p</dt><dd>{fmt(probe.p)}</dd>
+                <dt>U</dt><dd>{fmt(probe.u)}</dd>
+                <dt>T</dt><dd>{fmt(probe.t)}</dd>
+              </dl>
+              <p className="cfd-probe-coords">
+                ({fmt(probe.x)}, {fmt(probe.y)}, {fmt(probe.z)})
+              </p>
+            </div>
+          </>
+        )}
+      </div>
     </section>
   );
 }
