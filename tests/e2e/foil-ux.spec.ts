@@ -216,6 +216,18 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(probe.locator('dd')).toHaveCount(3);
     await expect(probe).toContainText(/[−-]?\d+\.\d+/);
 
+    const dotBefore = await page.locator('.cfd-probe-dot').boundingBox();
+    const orbit = { x: box.x + box.width * 0.3, y: box.y + box.height * 0.3 };
+    await page.mouse.move(orbit.x, orbit.y);
+    await page.mouse.down();
+    await page.mouse.move(orbit.x + 70, orbit.y + 30, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(600);
+    const dotAfter = await page.locator('.cfd-probe-dot').boundingBox();
+    expect(dotBefore).toBeTruthy();
+    expect(dotAfter).toBeTruthy();
+    expect(Math.abs(dotAfter!.x - dotBefore!.x) + Math.abs(dotAfter!.y - dotBefore!.y)).toBeGreaterThan(4);
+
     const csvEvt = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export CSV' }).click();
     const csv = await csvEvt;

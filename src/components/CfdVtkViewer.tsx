@@ -73,6 +73,11 @@ interface RendererLike {
   resetCameraClippingRange(): void;
 }
 
+interface ViewNodeLike {
+  getFramebufferSize?: () => number[];
+  worldToDisplay?: (x: number, y: number, z: number, renderer: unknown) => number[];
+}
+
 function bounds(renderer: RendererLike) {
   const b = renderer.computeVisiblePropBounds();
   return {
@@ -113,11 +118,36 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
   const initFailedRef = useRef(false);
   const dataRef = useRef<VtkDataLike | null>(null);
   const datasetRef = useRef<string | null>(null);
+  const probeWorldRef = useRef<ProbeSample | null>(null);
   const [status, setStatus] = useState('Waiting for layout…');
   const [legend, setLegend] = useState<{ name: string; lo: number; hi: number } | null>(null);
   const [probe, setProbe] = useState<Probe | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const downRef = useRef<{ x: number; y: number } | null>(null);
+
+  const projectProbe = () => {
+    const vtk = vtkRef.current;
+    const sample = probeWorldRef.current;
+    const surface = containerRef.current;
+    if (!vtk || !sample || !surface) return;
+    const rect = surface.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const m = vtk.actor.getMatrix();
+    const wx = m[0] * sample.x + m[4] * sample.y + m[8] * sample.z + m[12];
+    const wy = m[1] * sample.x + m[5] * sample.y + m[9] * sample.z + m[13];
+    const wz = m[2] * sample.x + m[6] * sample.y + m[10] * sample.z + m[14];
+    const renderer = vtk.view.getRenderer();
+    const views = (vtk.view.getRenderWindow() as unknown as { getViews?: () => ViewNodeLike[] }).getViews?.();
+    const vnode = views?.[0];
+    if (!vnode?.worldToDisplay) return;
+    const disp = vnode.worldToDisplay(wx, wy, wz, renderer);
+    if (!disp || !Number.isFinite(disp[0]) || !Number.isFinite(disp[1])) return;
+    const fb = vnode.getFramebufferSize?.() ?? [rect.width, rect.height];
+    if (!fb[0] || !fb[1]) return;
+    const left = (disp[0] / fb[0]) * rect.width;
+    const top = rect.height - (disp[1] / fb[1]) * rect.height;
+    setProbe((prev) => (prev ? { ...prev, left, top } : prev));
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -162,8 +192,10 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
           if (next === lastSize) return;
           lastSize = next;
           try { cur.view.resize(); cur.view.getRenderWindow().render(); } catch { /* noop */ }
+          projectProbe();
         });
         ro.observe(container);
+        view.getInteractor().onEndInteraction(projectProbe);
         vtkRef.current = { view, reader, normals, mapper, actor, ctf, picker, ro };
         setStatus('Ready — loading dataset…');
       } catch (err) {
@@ -202,6 +234,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       const vtk = vtkRef.current;
       if (!vtk) return;
       setProbe(null);
+      probeWorldRef.current = null;
       onProbe?.(null);
       const datasetChanged = datasetRef.current !== datasetUrl;
       datasetRef.current = datasetUrl;
@@ -272,6 +305,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       (rotationZ * 180) / Math.PI,
     );
     vtk.view.getRenderWindow().render();
+    projectProbe();
   }, [rotationX, rotationY, rotationZ]);
 
   useEffect(() => {
@@ -287,10 +321,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     cam.setPosition(pos[0] + (x - fp[0]), pos[1] + (y - fp[1]), pos[2] + (z - fp[2]));
     renderer.resetCameraClippingRange();
     vtk.view.getRenderWindow().render();
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (rect) {
-      setProbe((prev) => (prev ? { ...prev, left: rect.width / 2, top: rect.height / 2 } : prev));
-    }
+    projectProbe();
     setAnnouncement(`Centered on probe ${fmtProbe(x)}, ${fmtProbe(y)}, ${fmtProbe(z)}`);
   }, [focusRequest]);
 
@@ -370,6 +401,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     const id = vtk.picker.getPointId();
     if (!Number.isFinite(id) || id < 0) {
       setProbe(null);
+      probeWorldRef.current = null;
       onProbe?.(null);
       return;
     }
@@ -392,6 +424,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
         : Number.NaN,
       t: comp('T', id, 0),
     };
+    probeWorldRef.current = sample;
     setProbe({ ...sample, left: clientX - rect.left, top: clientY - rect.top });
     onProbe?.(sample);
   };
@@ -404,7 +437,10 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     const down = downRef.current;
     downRef.current = null;
     if (!down) return;
-    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) {
+      projectProbe();
+      return;
+    }
     pickAt(e.clientX, e.clientY);
   };
 
@@ -416,6 +452,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     if (mode === 'iso') fitIso(renderer);
     else fitOrtho(renderer, mode);
     vtk.view.getRenderWindow().render();
+    projectProbe();
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -438,6 +475,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       e.preventDefault();
       renderer.resetCameraClippingRange();
       vtk.view.getRenderWindow().render();
+      projectProbe();
     }
   };
 
@@ -494,7 +532,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
             <div className="cfd-probe" role="status">
               <div className="cfd-probe-head">
                 <strong>Probe</strong>
-                <button type="button" className="cfd-probe-close" onClick={() => { setProbe(null); onProbe?.(null); }} aria-label="Clear probe">×</button>
+                <button type="button" className="cfd-probe-close" onClick={() => { setProbe(null); probeWorldRef.current = null; onProbe?.(null); }} aria-label="Clear probe">×</button>
               </div>
               <dl>
                 <dt>p</dt><dd>{fmtProbe(probe.p)}</dd>
