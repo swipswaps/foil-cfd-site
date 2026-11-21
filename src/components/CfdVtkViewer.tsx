@@ -16,6 +16,7 @@ import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
 import vtkPolyDataNormals from '@kitware/vtk.js/Filters/Core/PolyDataNormals';
 import vtkDataArray from '@kitware/vtk.js/Common/Core/DataArray';
+import vtkPolyData from '@kitware/vtk.js/Common/DataModel/PolyData';
 import vtkColorTransferFunction from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction';
 import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
 import vtkPointPicker from '@kitware/vtk.js/Rendering/Core/PointPicker';
@@ -29,6 +30,7 @@ interface Props {
   rotationZ: number;
   onProbe?: (sample: ProbeSample | null) => void;
   freeStream?: FreeStream;
+  sectionCn?: number;
   focusRequest?: { sample: ProbeSample; nonce: number } | null;
 }
 
@@ -112,7 +114,7 @@ function fitOrtho(renderer: RendererLike, mode: 'top' | 'side') {
   renderer.resetCameraClippingRange();
 }
 
-export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ, onProbe, freeStream, focusRequest }: Props) {
+export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ, onProbe, freeStream, sectionCn, focusRequest }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vtkRef = useRef<VtkRefs | null>(null);
   const initFailedRef = useRef(false);
@@ -123,7 +125,160 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
   const [legend, setLegend] = useState<{ name: string; lo: number; hi: number } | null>(null);
   const [probe, setProbe] = useState<Probe | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [showVectors, setShowVectors] = useState(false);
+  const showVectorsRef = useRef(false);
+  const glyphRef = useRef<{
+    actor: ReturnType<typeof vtkActor.newInstance>;
+    mapper: ReturnType<typeof vtkMapper.newInstance>;
+    ctf: ReturnType<typeof vtkColorTransferFunction.newInstance>;
+  } | null>(null);
+  const rebuildVectorsRef = useRef<(data: VtkDataLike | null, on: boolean) => void>(() => {});
   const downRef = useRef<{ x: number; y: number } | null>(null);
+
+  const clearGlyphs = () => {
+    const vtk = vtkRef.current;
+    const g = glyphRef.current;
+    if (!vtk || !g) return;
+    try { vtk.view.getRenderer().removeActor(g.actor); } catch { /* noop */ }
+    try { g.actor.delete(); } catch { /* noop */ }
+    try { g.mapper.delete(); } catch { /* noop */ }
+    try { g.ctf.delete(); } catch { /* noop */ }
+    glyphRef.current = null;
+  };
+
+  const rebuildVectors = (data: VtkDataLike | null, on: boolean) => {
+    const vtk = vtkRef.current;
+    if (!vtk) return;
+    clearGlyphs();
+    const render = () => vtk.view.getRenderWindow().render();
+    if (!on || !data || !vtk.added) {
+      render();
+      return;
+    }
+    const u = data.getPointData().getArrayByName('U');
+    if (!u) {
+      setAnnouncement('Flow vectors unavailable: no U array');
+      render();
+      return;
+    }
+    const n = data.getNumberOfPoints();
+    const pts = data.getPoints().getData();
+    const stride = Math.max(1, Math.floor(n / 120));
+    const sampled: number[] = [];
+    let maxU = 0;
+    for (let i = 0; i < n; i += stride) {
+      const m = Math.hypot(u.getComponent(i, 0) || 0, u.getComponent(i, 1) || 0, u.getComponent(i, 2) || 0);
+      if (m > 1e-6) {
+        sampled.push(i);
+        if (m > maxU) maxU = m;
+      }
+    }
+    if (sampled.length === 0 || maxU <= 0) {
+      setAnnouncement('Flow vectors: no non-zero velocities');
+      render();
+      return;
+    }
+    const len = 0.16;
+    const back = len * 0.35;
+    const wing = len * 0.18;
+    const verts = new Float32Array(sampled.length * 12);
+    const lines = new Uint32Array(sampled.length * 9);
+    const mags = new Float32Array(sampled.length * 4);
+    sampled.forEach((i, k) => {
+      const px = Number(pts[i * 3]);
+      const py = Number(pts[i * 3 + 1]);
+      const pz = Number(pts[i * 3 + 2]);
+      const ux = u.getComponent(i, 0) || 0;
+      const uy = u.getComponent(i, 1) || 0;
+      const uz = u.getComponent(i, 2) || 0;
+      const m = Math.hypot(ux, uy, uz) || 1;
+      const dx = ux / m;
+      const dy = uy / m;
+      const dz = uz / m;
+      const tx = px + dx * len;
+      const ty = py + dy * len;
+      const tz = pz + dz * len;
+      // A perpendicular picks the arrowhead plane; avoid the degenerate case
+      // when the flow is nearly parallel to Z.
+      const ax = Math.abs(dz) < 0.9 ? 0 : 1;
+      const ay = 0;
+      const az = Math.abs(dz) < 0.9 ? 1 : 0;
+      let hx = dy * az - dz * ay;
+      let hy = dz * ax - dx * az;
+      let hz = dx * ay - dy * ax;
+      const hn = Math.hypot(hx, hy, hz) || 1;
+      hx /= hn;
+      hy /= hn;
+      hz /= hn;
+      const b0 = k * 4;
+      verts[b0 * 3] = px;
+      verts[b0 * 3 + 1] = py;
+      verts[b0 * 3 + 2] = pz;
+      verts[(b0 + 1) * 3] = tx;
+      verts[(b0 + 1) * 3 + 1] = ty;
+      verts[(b0 + 1) * 3 + 2] = tz;
+      verts[(b0 + 2) * 3] = tx - dx * back + hx * wing;
+      verts[(b0 + 2) * 3 + 1] = ty - dy * back + hy * wing;
+      verts[(b0 + 2) * 3 + 2] = tz - dz * back + hz * wing;
+      verts[(b0 + 3) * 3] = tx - dx * back - hx * wing;
+      verts[(b0 + 3) * 3 + 1] = ty - dy * back - hy * wing;
+      verts[(b0 + 3) * 3 + 2] = tz - dz * back - hz * wing;
+      const l0 = k * 9;
+      lines[l0] = 2;
+      lines[l0 + 1] = b0;
+      lines[l0 + 2] = b0 + 1;
+      lines[l0 + 3] = 2;
+      lines[l0 + 4] = b0 + 1;
+      lines[l0 + 5] = b0 + 2;
+      lines[l0 + 6] = 2;
+      lines[l0 + 7] = b0 + 1;
+      lines[l0 + 8] = b0 + 3;
+      for (let q = 0; q < 4; q++) mags[k * 4 + q] = m;
+    });
+    const poly = vtkPolyData.newInstance();
+    poly.getPoints().setData(verts, 3);
+    poly.getLines().setData(lines);
+    poly.getPointData().setScalars(
+      vtkDataArray.newInstance({ name: 'Umag', values: mags, numberOfComponents: 1 }),
+    );
+    const ctf = vtkColorTransferFunction.newInstance();
+    const preset =
+      vtkColorMaps.getPresetByName('Viridis (matplotlib)') ??
+      vtkColorMaps.getPresetByName('Cool to Warm');
+    if (preset) ctf.applyColorMap(preset);
+    ctf.setMappingRange(0, maxU);
+    const mapper = vtkMapper.newInstance();
+    mapper.setInputData(poly);
+    mapper.setLookupTable(ctf);
+    mapper.setScalarRange(0, maxU);
+    mapper.setScalarVisibility(true);
+    const actor = vtkActor.newInstance();
+    actor.setMapper(mapper);
+    actor.getProperty().setLineWidth(2);
+    actor.setOrientation(
+      (rotationX * 180) / Math.PI,
+      (rotationY * 180) / Math.PI,
+      (rotationZ * 180) / Math.PI,
+    );
+    vtk.view.getRenderer().addActor(actor);
+    glyphRef.current = { actor, mapper, ctf };
+    render();
+    setAnnouncement(`Flow vectors on · ${sampled.length} glyphs · colour = |U|`);
+  };
+
+  // No dependency array on purpose: sync every render so the load effect
+  // never closes over a stale rebuild function (it reads current rotation).
+  useEffect(() => {
+    rebuildVectorsRef.current = rebuildVectors;
+  });
+
+  const toggleVectors = () => {
+    const next = !showVectorsRef.current;
+    showVectorsRef.current = next;
+    setShowVectors(next);
+    rebuildVectors(dataRef.current, next);
+    if (!next) setAnnouncement('Flow vectors off');
+  };
 
   const projectProbe = () => {
     const vtk = vtkRef.current;
@@ -209,6 +364,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       cancelAnimationFrame(raf);
       const vtk = vtkRef.current;
       if (vtk) {
+        clearGlyphs();
         try { vtk.ro?.disconnect(); } catch { /* noop */ }
         try { vtk.actor.delete(); } catch { /* noop */ }
         try { vtk.mapper.delete(); } catch { /* noop */ }
@@ -285,6 +441,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
           vtk.view.getRenderer().addActor(vtk.actor);
           vtk.added = true;
         }
+        if (showVectorsRef.current) rebuildVectorsRef.current(data as unknown as VtkDataLike, true);
         if (datasetChanged) fitIso(vtk.view.getRenderer() as unknown as RendererLike);
         vtk.view.getRenderWindow().render();
         setStatus(`${data.getNumberOfPoints()} pts · ${data.getNumberOfCells()} cells · field=${field}`);
@@ -300,6 +457,11 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     const vtk = vtkRef.current;
     if (!vtk) return;
     vtk.actor.setOrientation(
+      (rotationX * 180) / Math.PI,
+      (rotationY * 180) / Math.PI,
+      (rotationZ * 180) / Math.PI,
+    );
+    glyphRef.current?.actor.setOrientation(
       (rotationX * 180) / Math.PI,
       (rotationY * 180) / Math.PI,
       (rotationZ * 180) / Math.PI,
@@ -332,6 +494,9 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       datasetUrl,
       field,
       freeStream: freeStream ?? null,
+      analysis: {
+        sectionCn: typeof sectionCn === 'number' && Number.isFinite(sectionCn) ? sectionCn : null,
+      },
       probe: { x: probe.x, y: probe.y, z: probe.z, p: probe.p, U: probe.u, T: probe.t },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -509,6 +674,14 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
             title={probe ? 'Download probe.json with free-stream and Re context' : 'Probe the surface first'}
           >
             Export probe JSON
+          </button>
+          <button
+            type="button"
+            onClick={toggleVectors}
+            aria-pressed={showVectors}
+            title="Overlay sampled surface velocity vectors, coloured by |U| (light-path view, not volume streamlines)"
+          >
+            Flow vectors
           </button>
           <span className="cfd-vtk-hint">Click surface to probe</span>
         </div>

@@ -1,6 +1,7 @@
 import createPlotlyComponentImport from 'react-plotly.js/factory';
 import Plotly from 'plotly.js/lib/core';
 import * as scatterTrace from 'plotly.js/lib/scatter';
+import { SAMPLE_LOWER, SAMPLE_UPPER, type CpPoint } from '../lib/cp';
 
 const scatterModule =
   (scatterTrace as unknown as { default?: unknown }).default ?? scatterTrace;
@@ -13,7 +14,7 @@ const factory =
 
 const Plot = (factory as (p: unknown) => React.ComponentType<Record<string, unknown>>)(Plotly);
 
-export interface CpPoint { x: number; cp: number }
+export type { CpPoint } from '../lib/cp';
 
 interface Props {
   upper?: CpPoint[];
@@ -21,17 +22,8 @@ interface Props {
   title?: string;
 }
 
-const UPPER: CpPoint[] = [
-  { x: 0, cp: 1.0 }, { x: 0.05, cp: -0.9 }, { x: 0.1, cp: -1.5 },
-  { x: 0.3, cp: -1.0 }, { x: 0.6, cp: -0.4 }, { x: 1.0, cp: -0.1 },
-];
-const LOWER: CpPoint[] = [
-  { x: 0, cp: 1.0 }, { x: 0.05, cp: 0.4 }, { x: 0.2, cp: 0.2 },
-  { x: 0.5, cp: 0.1 }, { x: 1.0, cp: 0.0 },
-];
-
 export function CpPolarChart({
-  upper = UPPER, lower = LOWER,
+  upper = SAMPLE_UPPER, lower = SAMPLE_LOWER,
   title = 'Pressure Coefficient · Cp vs x/c',
 }: Props) {
   return (

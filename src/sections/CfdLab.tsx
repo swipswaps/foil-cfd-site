@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
 import type { CfdField } from '../App';
 import type { CpPoint } from '../components/CpPolarChart';
+import { SAMPLE_LOWER, SAMPLE_UPPER, sectionNormalForce } from '../lib/cp';
 import { freeStream, formatRe, type ProbeSample } from '../lib/probe';
 
 const CfdVtkViewer = lazy(() =>
@@ -40,6 +41,11 @@ export function CfdLab({
   sceneLabel, cp, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed, onProbe, focusRequest,
 }: Props) {
   const stream = freeStream(speed);
+  const sectionCn = cp
+    ? sectionNormalForce(cp.upper, cp.lower)
+    : chartNote
+    ? undefined
+    : sectionNormalForce(SAMPLE_UPPER, SAMPLE_LOWER);
   return (
     <section className="cfd-lab">
       <header className="cfd-lab-head">
@@ -71,6 +77,11 @@ export function CfdLab({
         <span title="Reynolds number based on chord">Re {formatRe(stream.reynolds)}</span>
         <span title="Dynamic pressure">q∞ {Math.round(stream.dynamicPressure)} Pa</span>
         <span title="Static temperature">T∞ {stream.temperature.toFixed(0)} K</span>
+        {sectionCn !== undefined && Number.isFinite(sectionCn) && (
+          <span title="Section normal-force coefficient integrated from the plotted Cp (post-processed, not solver output)">
+            Cn {sectionCn.toFixed(3)}
+          </span>
+        )}
       </div>
       {jobId && (
         <div className="cfd-job-status">Job {jobId.slice(0, 8)} · {jobStatus}</div>
@@ -78,7 +89,7 @@ export function CfdLab({
       <div className="cfd-lab-grid">
         <CfdVtkBoundary>
           <Suspense fallback={<FieldSkeleton label="VTK viewer" />}>
-            <CfdVtkViewer datasetUrl={datasetUrl} field={field} rotationX={rotationX} rotationY={rotationY} rotationZ={rotationZ} onProbe={onProbe} freeStream={stream} focusRequest={focusRequest} />
+            <CfdVtkViewer datasetUrl={datasetUrl} field={field} rotationX={rotationX} rotationY={rotationY} rotationZ={rotationZ} onProbe={onProbe} freeStream={stream} sectionCn={sectionCn} focusRequest={focusRequest} />
           </Suspense>
         </CfdVtkBoundary>
         {cp ? (

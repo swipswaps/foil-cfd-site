@@ -197,6 +197,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(fs).toContainText(/Re\s*[\d.]+×10/);
     await expect(fs).toContainText(/q∞\s*\d+\s*Pa/);
     await expect(fs).toContainText(/T∞\s*\d+\s*K/);
+    await expect(fs).toContainText(/Cn\s*0\.76/);
 
     await centerCanvas(page);
     const canvas = page.locator('.cfd-vtk-surface canvas').first();
@@ -249,6 +250,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     expect(payload.freeStream.temperature).toBeCloseTo(288.15, 2);
     expect(payload.freeStream.reynolds).toBeCloseTo(133333.33, 0);
     expect(payload.freeStream.dynamicPressure).toBeCloseTo(2.45, 2);
+    expect(payload.analysis.sectionCn).toBeCloseTo(0.7675, 2);
     expect(Number.isFinite(payload.probe.p)).toBe(true);
     expect(Number.isFinite(payload.probe.U)).toBe(true);
     expect(Number.isFinite(payload.probe.T)).toBe(true);
@@ -268,6 +270,31 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(probe).toHaveCount(0);
     await page.getByRole('button', { name: /open sidebar/i }).first().click();
     await expect(page.locator('.cfd-sidebar-probe')).toContainText(/No probe yet/);
+  });
+
+  test('flow vectors overlay toggles and changes the render', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    const canvas = await waitForLab(page);
+
+    await centerCanvas(page);
+    const offShot = await page.screenshot({ clip: roundBox((await canvas.boundingBox())!) });
+
+    const btn = page.getByRole('button', { name: 'Flow vectors' });
+    await expect(btn).toHaveAttribute('aria-pressed', 'false');
+    await btn.click();
+    await expect(btn).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.cfd-vtk-announce')).toContainText(/Flow vectors on · \d+ glyphs/);
+
+    await centerCanvas(page);
+    await page.waitForTimeout(600);
+    const onShot = await page.screenshot({ clip: roundBox((await canvas.boundingBox())!) });
+    expect(onShot.equals(offShot)).toBe(false);
+
+    await btn.click();
+    await expect(btn).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.cfd-vtk-announce')).toContainText(/Flow vectors off/);
   });
 
   test('phone layout stacks without horizontal overflow', async ({ page }) => {
