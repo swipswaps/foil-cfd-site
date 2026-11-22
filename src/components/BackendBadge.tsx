@@ -3,15 +3,16 @@ import type { BackendStatus } from '../hooks/useBackendProbe';
 interface Props {
   status: BackendStatus;
   reason: string;
+  actionLabel?: string;
   onRetry: () => void;
 }
 
-export function BackendBadge({ status, reason, onRetry }: Props) {
+export function BackendBadge({ status, reason, actionLabel = 'Retry', onRetry }: Props) {
   const label =
     status === 'online'
       ? 'Backend online'
       : status === 'probing'
-      ? 'Detecting backend…'
+      ? 'Checking local backend…'
       : `Static mode — ${reason}`;
 
   return (
@@ -20,7 +21,7 @@ export function BackendBadge({ status, reason, onRetry }: Props) {
       <span className="backend-label">{label}</span>
       {status !== 'online' && (
         <button type="button" onClick={onRetry} className="backend-retry">
-          Retry
+          {actionLabel}
         </button>
       )}
     </div>

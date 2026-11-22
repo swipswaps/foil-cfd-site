@@ -8,6 +8,7 @@ import { ReadmeSection } from './sections/ReadmeSection';
 import { ProjectShowcase } from './sections/ProjectShowcase';
 import { useBackendProbe } from './hooks/useBackendProbe';
 import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
+import { backendFetch } from './lib/backendFetch';
 import type { SceneContent } from './data/scene';
 import { buildSceneLab, type SceneLab } from './lib/sceneVtp';
 import type { ProbeSample } from './lib/probe';
@@ -148,7 +149,7 @@ export default function App() {
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await fetch(`${backend.backendOrigin}/api/jobs/${cfdJobId}`);
+        const res = await backendFetch(`${backend.backendOrigin}/api/jobs/${cfdJobId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (cancelled) return;
@@ -171,7 +172,7 @@ export default function App() {
     setCfdError(null);
     setCfdJobStatus('submitting');
     try {
-      const res = await fetch(`${backend.backendOrigin}/api/solve`, {
+      const res = await backendFetch(`${backend.backendOrigin}/api/solve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ case_id: 'naca0012' }),
@@ -248,6 +249,7 @@ export default function App() {
             <BackendBadge
               status={backend.status}
               reason={backend.reason}
+              actionLabel={backend.actionLabel}
               onRetry={backend.probe}
             />
           </div>

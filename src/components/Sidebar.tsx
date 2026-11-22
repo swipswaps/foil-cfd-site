@@ -140,16 +140,16 @@ export function Sidebar({
           </>
         ) : (
           <div className="flow-approx">
-            Static demo · sample wing. Start the backend for live solves:{' '}
-            <code>docker compose up --build -d</code>.
+            Static demo · bundled sample. For live solves, run{' '}
+            <code>docker compose up --build -d</code> on this machine, then{' '}
             <button
               type="button"
               onClick={onBackendRetry}
               className="upload-reset"
-              style={{ marginLeft: '0.5rem' }}
             >
-              Retry
+              Connect
             </button>
+            . The browser may ask for local network access.
           </div>
         )}
 

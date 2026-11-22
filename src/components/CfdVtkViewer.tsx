@@ -21,6 +21,7 @@ import vtkColorTransferFunction from '@kitware/vtk.js/Rendering/Core/ColorTransf
 import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
 import vtkPointPicker from '@kitware/vtk.js/Rendering/Core/PointPicker';
 import { fmtProbe, type FreeStream, type ProbeSample } from '../lib/probe';
+import { backendFetch } from '../lib/backendFetch';
 
 interface Props {
   datasetUrl: string;
@@ -395,7 +396,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       const datasetChanged = datasetRef.current !== datasetUrl;
       datasetRef.current = datasetUrl;
       try {
-        const res = await fetch(datasetUrl, { cache: 'no-store' });
+        const res = await backendFetch(datasetUrl, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buf = await res.arrayBuffer();
         if (cancelled) return;
@@ -510,7 +511,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
 
   const exportVtp = async () => {
     try {
-      const res = await fetch(datasetUrl);
+      const res = await backendFetch(datasetUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
