@@ -62,44 +62,39 @@ export function useBackendProbe() {
     solverAvailable: false,
   });
 
-  const runProbe = useCallback(async (): Promise<BackendState> => {
+  const probe = useCallback(async () => {
+    setState((s) => ({ ...s, status: 'probing' }));
     const isHttps =
       typeof window !== 'undefined' && window.location.protocol === 'https:';
 
     for (const base of candidateBases(isHttps)) {
       const result = await probeUrl(base);
       if (result.online) {
-        return {
+        setState({
           status: 'online',
           backendOrigin: base,
           reason: 'ok',
           mode: 'cfd',
           solverAvailable: result.solverAvailable,
-        };
+        });
+        return;
       }
     }
 
-    return {
+    setState({
       status: 'offline',
       backendOrigin: '',
-      reason: 'solver not connected',
+      reason: isHttps
+        ? 'no localhost backend — run: docker compose up -d'
+        : 'backend unreachable — run: docker compose up -d',
       mode: 'static',
       solverAvailable: false,
-    };
+    });
   }, []);
 
-  const probe = useCallback(async () => {
-    setState((s) => ({ ...s, status: 'probing' }));
-    setState(await runProbe());
-  }, [runProbe]);
-
   useEffect(() => {
-    let active = true;
-    runProbe().then((next) => {
-      if (active) setState(next);
-    });
-    return () => { active = false; };
-  }, [runProbe]);
+    probe();
+  }, [probe]);
 
   return { ...state, probe };
 }
