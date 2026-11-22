@@ -1,6 +1,5 @@
 """FOIL.CFD OpenFOAM/PyVista backend."""
 from __future__ import annotations
-import os
 import shutil
 import subprocess
 import threading
@@ -10,8 +9,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-
-from job_retention import DEFAULT_MAX_JOBS, DEFAULT_TTL_DAYS, prune_jobs
 
 app = FastAPI(title="FOIL.CFD OpenFOAM Backend", version="1.1.0")
 
@@ -34,35 +31,6 @@ CASES = BASE / "cases"
 JOBS.mkdir(exist_ok=True)
 
 REGISTRY: dict[str, dict] = {}
-
-
-def _env_number(name: str, default: float) -> float:
-    try:
-        return float(os.getenv(name, str(default)))
-    except ValueError:
-        return float(default)
-
-
-def _prune_jobs() -> None:
-    running = {
-        jid for jid, meta in list(REGISTRY.items())
-        if meta.get("status") in ("queued", "running")
-    }
-    removed = prune_jobs(
-        JOBS,
-        keep=int(_env_number("FOIL_MAX_JOBS", DEFAULT_MAX_JOBS)),
-        max_age_days=_env_number("FOIL_JOB_TTL_DAYS", DEFAULT_TTL_DAYS),
-        exclude=running,
-    )
-    for jid in removed:
-        REGISTRY.pop(jid, None)
-    for jid, meta in list(REGISTRY.items()):
-        directory = meta.get("directory")
-        if directory is not None and not directory.is_dir():
-            REGISTRY.pop(jid, None)
-
-
-_prune_jobs()
 
 
 class SolveRequest(BaseModel):
@@ -112,7 +80,6 @@ def _run_solver(job_id: str, case_dir: Path) -> None:
 
 @app.post("/api/solve")
 def solve(req: SolveRequest):
-    _prune_jobs()
     job_id = str(uuid.uuid4())
     job_dir = JOBS / job_id
     src = CASES / req.case_id
