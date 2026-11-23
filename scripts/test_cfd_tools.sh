@@ -31,6 +31,7 @@ if [ "$H_CODE" = "200" ]; then
   check "  status == 'online'" "$([ "$H_ST" = "online" ] && echo 1 || echo 0)" "got '$H_ST'"
   H_SOLVER=$(python3 -c "import json;print(json.load(open('/tmp/foil-health.json')).get('solver_available',False))" 2>/dev/null || echo "False")
   echo "  [INFO] solver_available = $H_SOLVER"
+  if [ "$H_SOLVER" = "True" ]; then POLL_TRIES=150; else POLL_TRIES=20; fi
 else
   check "GET /api/health → 200" 0 "HTTP $H_CODE (is docker compose up?)"
   echo ""
@@ -76,7 +77,7 @@ if [ -n "$JOB_ID" ]; then
   echo "[4] Polling /api/jobs/$JOB_ID"
   sleep 2
   J_ST=""
-  for i in $(seq 1 20); do
+  for i in $(seq 1 "$POLL_TRIES"); do
     curl -s -m 5 "$BASE/api/jobs/$JOB_ID" -o /tmp/foil-job.json
     J_ST=$(python3 -c "import json;print(json.load(open('/tmp/foil-job.json')).get('status',''))" 2>/dev/null || echo "")
     [ "$J_ST" = "completed" ] && break
@@ -95,6 +96,12 @@ if [ -n "$JOB_ID" ]; then
       check "GET /analysis → 200" 1
       N_PTS=$(python3 -c "import json;print(json.load(open('/tmp/foil-analysis.json')).get('n_points',0))" 2>/dev/null || echo 0)
       check "  n_points > 0" "$([ "$N_PTS" -gt 0 ] && echo 1 || echo 0)" "n_points=$N_PTS"
+      A_SRC=$(python3 -c "import json;print(json.load(open('/tmp/foil-analysis.json')).get('source',''))" 2>/dev/null || echo "")
+      if [ "$H_SOLVER" = "True" ]; then
+        check "  analysis source == 'openfoam'" "$([ "$A_SRC" = "openfoam" ] && echo 1 || echo 0)" "source=$A_SRC"
+      else
+        echo "  [INFO] analysis source = ${A_SRC:-unknown}"
+      fi
     else
       check "GET /analysis → 200" 0 "HTTP $A_CODE"
     fi

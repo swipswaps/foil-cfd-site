@@ -26,14 +26,18 @@ http://127.0.0.1:8000/api/health. If the backend is up, the status pill
 turns green. If not, the site runs in static mode — same experience as
 the GitHub Pages deploy.
 
-To run the optional backend locally:
+To run the optional backend locally (FastAPI + PyVista; synthetic previews):
 
     docker compose up --build -d
 
-The backend is a minimal FastAPI service exposing /api/health. It exists
-to demonstrate the online/offline detection pattern, not to do real CFD
-solves. Swap in your solver behind the same endpoint and the front end
-will pick it up automatically.
+To run the OpenFOAM image with a real simpleFoam solve:
+
+    docker compose -f docker-compose.openfoam.yml up -d --build
+
+The bundled case (backend/cases/naca0012) is a 2D channel mesh, not an
+airfoil. Replace it with snappyHexMesh plus a NACA0012 STL for a real
+airfoil RANS case. The light backend runs synthetic previews; the OpenFOAM
+backend runs blockMesh and simpleFoam and exports the solved surface.
 
 
 DEPLOYMENT

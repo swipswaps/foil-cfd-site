@@ -49,15 +49,43 @@ def ensure_default_surface(output_path: Path) -> Path:
     return output_path
 
 
+def _with_point_fields(block):
+    """Convert cell fields to point fields so the VTP viewer can colour them."""
+    if block is None:
+        return None
+    try:
+        if int(getattr(block, "n_points", 0)) == 0:
+            return block
+        point_data = getattr(block, "point_data", None)
+        cell_data = getattr(block, "cell_data", None)
+        if cell_data is not None and len(cell_data) > 0:
+            if point_data is None or "U" not in point_data:
+                return block.cell_data_to_point_data()
+    except Exception:
+        pass
+    return block
+
+
 def _read_case_block(case_dir: Path):
     foam_file = case_dir / "case.foam"
     if not foam_file.exists():
         foam_file.write_text("FOAM 4.1")
     reader = pv.get_reader(str(foam_file))
+    try:
+        raw_times = getattr(reader, "time_values", None)
+        times = list(raw_times) if raw_times is not None else []
+        if times:
+            reader.set_active_time_value(max(times))
+    except Exception:
+        pass
     dataset = reader.read()
     if isinstance(dataset, pv.MultiBlock):
-        return dataset[0] if dataset.n_blocks > 0 else None
-    return dataset
+        blocks = [dataset[i] for i in range(dataset.n_blocks)]
+        for block in blocks:
+            if block is not None and int(getattr(block, "n_points", 0)) > 0:
+                return _with_point_fields(block)
+        return blocks[0] if blocks else None
+    return _with_point_fields(dataset)
 
 
 def _finite(value, default=0.0) -> float:

@@ -83,6 +83,7 @@ def health():
 def _run_solver(job_id: str, case_dir: Path) -> None:
     REGISTRY[job_id]["status"] = "running"
     log = []
+    failure = ""
     try:
         if shutil.which("blockMesh"):
             r = subprocess.run(
@@ -91,19 +92,26 @@ def _run_solver(job_id: str, case_dir: Path) -> None:
             )
             log.append(f"--- blockMesh (rc={r.returncode}) ---\n{r.stdout}\n{r.stderr}")
             (case_dir / "log.blockMesh").write_text(log[-1])
+            if r.returncode != 0:
+                failure = f"blockMesh exited with code {r.returncode}"
 
-        if shutil.which("simpleFoam"):
+        if not failure and shutil.which("simpleFoam"):
             r = subprocess.run(
                 ["simpleFoam", "-case", str(case_dir)],
                 capture_output=True, text=True, timeout=900,
             )
             log.append(f"--- simpleFoam (rc={r.returncode}) ---\n{r.stdout}\n{r.stderr}")
             (case_dir / "log.simpleFoam").write_text(log[-1])
+            if r.returncode != 0:
+                failure = f"simpleFoam exited with code {r.returncode}"
 
-        if not shutil.which("simpleFoam"):
-            (case_dir / "case.foam").write_text("FOAM 4.1")
+        (case_dir / "case.foam").write_text("FOAM 4.1")
 
-        REGISTRY[job_id]["status"] = "completed"
+        if failure:
+            REGISTRY[job_id]["status"] = "failed"
+            REGISTRY[job_id]["error"] = failure
+        else:
+            REGISTRY[job_id]["status"] = "completed"
     except Exception as exc:
         REGISTRY[job_id]["status"] = "failed"
         REGISTRY[job_id]["error"] = str(exc)
