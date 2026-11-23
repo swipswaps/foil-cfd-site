@@ -58,6 +58,14 @@ jobs:
           done
           docker compose logs backend
           exit 1
+      - name: Assert local-network CORS header (PNA)
+        run: |
+          curl -fsS -X OPTIONS \
+            -H 'Origin: https://swipswaps.github.io' \
+            -H 'Access-Control-Request-Method: GET' \
+            -H 'Access-Control-Request-Private-Network: true' \
+            -D - -o /dev/null http://127.0.0.1:8002/api/health \
+            | grep -i 'access-control-allow-private-network: true'
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Build site with backend origin

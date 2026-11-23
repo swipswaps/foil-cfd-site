@@ -28,6 +28,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Chrome Local Network Access: a public page reaching a loopback backend sends a
+# preflight with Access-Control-Request-Private-Network; the server must answer
+# with Access-Control-Allow-Private-Network: true or the fetch is blocked even
+# after the user grants permission. Starlette CORSMiddleware does not emit it.
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class PrivateNetworkAccess(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
+
+
+app.add_middleware(PrivateNetworkAccess)
+
 BASE = Path(__file__).resolve().parent
 JOBS = BASE / "jobs"
 CASES = BASE / "cases"
