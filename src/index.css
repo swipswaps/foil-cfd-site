@@ -251,9 +251,9 @@ a { color: inherit; }
    BACKEND BADGE
    ========================================================================= */
 .backend-badge-wrapper {
-  position: fixed;
-  top: 64px;
-  right: 16px;
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px 0;
   z-index: 40;
 }
 .app-frame.device-tablet .backend-badge-wrapper {

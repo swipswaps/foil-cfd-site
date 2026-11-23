@@ -131,3 +131,42 @@ test.describe('hydro workbench components', () => {
     expect(errs.filter(e => !BENIGN.test(e))).toEqual([]);
   });
 });
+
+test.describe('layout + retry regressions', () => {
+  const BE = /\/\/(?:127\.0\.0\.1|localhost):(?:8000|8002)\//;
+
+  test('backend badge never overlaps the hero tabs or the lab header', async ({ page }) => {
+    await page.route(BE, r => r.abort('failed'));
+    await page.goto(HOME + '#cfd', { waitUntil: 'load' });
+    await expect(page.locator('.cfd-lab-head').first()).toBeVisible({ timeout: 20_000 });
+    await page.waitForTimeout(300);
+    const box = (sel: string) => page.locator(sel).first().evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    });
+    const badge = await box('.backend-badge');
+    for (const sel of ['[role="tablist"]', '.cfd-lab-head', '[aria-label="Free-stream conditions"]']) {
+      const o = await box(sel).catch(() => null);
+      if (!o) continue;
+      const area = Math.max(0, Math.min(badge.r, o.r) - Math.max(badge.l, o.l)) *
+                   Math.max(0, Math.min(badge.b, o.b) - Math.max(badge.t, o.t));
+      expect(area, sel + ' overlaps the backend badge').toBe(0);
+    }
+  });
+
+  test('Retry flips offline -> online when a loopback backend answers', async ({ page }) => {
+    await page.route(BE, r => r.abort('failed'));
+    await page.goto(HOME, { waitUntil: 'load' });
+    await expect(page.locator('.backend-badge')).toContainText(/Static mode|offline|unavail/i, { timeout: 20_000 });
+    await openLab(page);
+    await page.unroute(BE);
+    await page.route('**/api/health', r => r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'online', backend: 'test', solver_available: true, blockMesh_available: true, vtk_data_available: true }),
+    }));
+    await page.locator('.backend-retry').first().click();
+    await expect(page.locator('.backend-badge')).toContainText(/Backend online/i, { timeout: 20_000 });
+    await expect(page.locator('.cfd-lab-status')).toContainText(/OpenFOAM ready/i, { timeout: 20_000 });
+  });
+});
