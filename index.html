@@ -7,7 +7,33 @@
     <meta name="description" content="FOIL.CFD — CFD, CAD, and 3D tools for engineering research." />
     <meta name="theme-color" content="#06121A" />
     <title>FOIL.CFD</title>
-  </head>
+  <script>
+// stale-chunk-recovery: a new deploy replaces hashed chunks; a client holding an
+// old index/main lazy-imports a chunk that no longer exists. Reload once,
+// cache-busted, so the client picks up the current index + chunks.
+(function () {
+  var KEY = 'staleChunkReloadAt';
+  function recover() {
+    try {
+      var now = Date.now();
+      var last = Number(sessionStorage.getItem(KEY) || 0);
+      if (now - last < 15000) return;
+      sessionStorage.setItem(KEY, String(now));
+      var u = new URL(window.location.href);
+      u.searchParams.set('v', String(now));
+      window.location.replace(u.toString());
+    } catch (e) {
+      window.location.reload();
+    }
+  }
+  window.addEventListener('vite:preloadError', function (e) { e.preventDefault(); recover(); });
+  window.addEventListener('unhandledrejection', function (e) {
+    var m = (e && e.reason && (e.reason.message || String(e.reason))) || '';
+    if (/dynamically imported module|Importing a module script failed|ChunkLoadError/i.test(m)) recover();
+  });
+})();
+</script>
+</head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
