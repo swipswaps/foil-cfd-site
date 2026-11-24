@@ -18,6 +18,12 @@ interface HydroParams {
   waterTempC: number;
 }
 
+interface CpStation {
+  xc: number;
+  cpUpper: number;
+  cpLower: number;
+}
+
 function computeHydroMetrics(p: HydroParams) {
   const rho = 1025.0;
   const g = 9.80665;
@@ -144,7 +150,7 @@ function HydrofoilAssembly({ aoaDeg, speedKnots, cavitating }: { aoaDeg: number;
   );
 }
 
-function CpCavitationChart({ stations, sigma, cavitating }: { stations: any[]; sigma: number; cavitating: boolean }) {
+function CpCavitationChart({ stations, sigma, cavitating }: { stations: CpStation[]; sigma: number; cavitating: boolean }) {
   const w = 540; const h = 230; const padL = 46; const padR = 16; const padT = 18; const padB = 30;
   const innerW = w - padL - padR; const innerH = h - padT - padB;
   const minCp = Math.min(-3.0, -sigma - 0.4, ...stations.map((s) => s.cpUpper));

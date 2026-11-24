@@ -17,6 +17,12 @@ const DEV_BACKENDS = ['http://127.0.0.1:8000', 'http://127.0.0.1:8002'];
 const HTTPS_BACKENDS = ['http://127.0.0.1:8002', 'http://127.0.0.1:8000', 'http://localhost:8002'];
 const LOCAL_TIMEOUT_MS = 2_500;
 const CONSENT_TIMEOUT_MS = 30_000;
+// The first paint can block the main thread for several seconds while the 3D
+// scene compiles shaders. A 2.5s same-origin probe then aborts after its
+// response already arrived (the abort timer runs before the fetch microtask),
+// so the badge sticks on "Static mode" until a manual Retry. The same-origin
+// proxy is local, so a longer deadline costs nothing when it is healthy.
+const SAME_ORIGIN_TIMEOUT_MS = 10_000;
 
 const PERMISSION_DENIED =
   'local network permission blocked — allow this site in browser settings';
@@ -24,22 +30,42 @@ const PUBLIC_OFFLINE =
   'local backend offline — run: docker compose up -d, then Connect';
 
 type LoopbackPermission = PermissionState | 'unknown';
+type HostClass = 'loopback' | 'private' | 'public';
 
-function pageIsLoopback(): boolean {
-  if (typeof window === 'undefined') return true;
-  const host = window.location.hostname.replace(/^\[|\]$/g, '');
-  return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+function classifyHost(rawHost: string): HostClass {
+  const host = rawHost.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return 'loopback';
+  if (host.endsWith('.local') || host.endsWith('.ts.net')) return 'private';
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)) return 'private';
+  if (/^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host)) return 'private';
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return 'private';
+  if (host.includes(':') && (host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80'))) {
+    return 'private';
+  }
+  return 'public';
 }
 
-function candidateBases(isHttps: boolean): string[] {
+function pageHostClass(): HostClass {
+  if (typeof window === 'undefined') return 'loopback';
+  return classifyHost(window.location.hostname);
+}
+
+function pageNeedsConsent(): boolean {
+  return pageHostClass() === 'public';
+}
+
+function candidateBases(isHttps: boolean, preferSameOrigin: boolean): string[] {
   const env = import.meta.env?.VITE_BACKEND_URL as string | undefined;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  // A public page uses the build-time backend only; a private/tailnet page
+  // must try its own origin first, or a baked tailnet-IP URL breaks the moment
+  // the app is opened through a different address (for example HTTPS Serve).
+  if (!preferSameOrigin && env && env.trim()) return [env.trim().replace(/\/+$/, '')];
   const list: string[] = [];
-  if (env && env.trim()) {
-    list.push(env.trim().replace(/\/+$/, ''));
-  } else {
-    list.push(...(isHttps ? HTTPS_BACKENDS : DEV_BACKENDS));
-  }
-  if (typeof window !== 'undefined') list.push(window.location.origin);
+  if (preferSameOrigin && origin) list.push(origin);
+  if (env && env.trim()) list.push(env.trim().replace(/\/+$/, ''));
+  list.push(...(isHttps ? HTTPS_BACKENDS : DEV_BACKENDS));
+  if (origin) list.push(origin);
   return Array.from(new Set(list));
 }
 
@@ -98,22 +124,24 @@ async function probeUrl(base: string, timeoutMs: number): Promise<ProbeResult> {
   }
 }
 
-function offlineReason(publicPage: boolean, blocked: boolean, timedOut: boolean): string {
+function offlineReason(needsConsent: boolean, blocked: boolean): string {
   if (blocked) return PERMISSION_DENIED;
-  if (publicPage) return PUBLIC_OFFLINE;
-  if (timedOut) return 'backend unreachable — run: docker compose up -d';
+  if (needsConsent) return PUBLIC_OFFLINE;
   return 'backend unreachable — run: docker compose up -d';
 }
 
+function actionLabelFor(needsConsent: boolean): string {
+  return needsConsent ? 'Connect local backend' : 'Retry';
+}
+
 function initialState(): BackendState {
-  const publicPage = !pageIsLoopback();
   return {
     status: 'probing',
     backendOrigin: '',
     reason: '',
     mode: 'static',
     solverAvailable: false,
-    actionLabel: publicPage ? 'Connect local backend' : 'Retry',
+    actionLabel: actionLabelFor(pageNeedsConsent()),
   };
 }
 
@@ -124,10 +152,12 @@ export function useBackendProbe() {
     setState((s) => ({ ...s, status: 'probing', reason: '' }));
     const isHttps =
       typeof window !== 'undefined' && window.location.protocol === 'https:';
-    const publicPage = !pageIsLoopback();
-    const actionLabel = publicPage ? 'Connect local backend' : 'Retry';
+    const needsConsent = pageNeedsConsent();
+    const preferSameOrigin = pageHostClass() === 'private';
+    const actionLabel = actionLabelFor(needsConsent);
+    const timeoutMs = needsConsent ? CONSENT_TIMEOUT_MS : LOCAL_TIMEOUT_MS;
 
-    if (publicPage) {
+    if (needsConsent) {
       const permission = await loopbackPermission();
       if (permission === 'denied') {
         setState({
@@ -142,10 +172,12 @@ export function useBackendProbe() {
       }
     }
 
+    const sameOrigin = typeof window !== 'undefined' ? window.location.origin : '';
     let blocked = false;
-    let timedOut = false;
-    for (const base of candidateBases(isHttps)) {
-      const result = await probeUrl(base, publicPage ? CONSENT_TIMEOUT_MS : LOCAL_TIMEOUT_MS);
+    for (const base of candidateBases(isHttps, preferSameOrigin)) {
+      const perBaseTimeout =
+        preferSameOrigin && base === sameOrigin ? SAME_ORIGIN_TIMEOUT_MS : timeoutMs;
+      const result = await probeUrl(base, perBaseTimeout);
       if (result.online) {
         setState({
           status: 'online',
@@ -158,13 +190,12 @@ export function useBackendProbe() {
         return;
       }
       blocked = blocked || result.blocked;
-      timedOut = timedOut || result.reason === 'timeout';
     }
 
     setState({
       status: 'offline',
       backendOrigin: '',
-      reason: offlineReason(publicPage, blocked, timedOut),
+      reason: offlineReason(needsConsent, blocked),
       mode: 'static',
       solverAvailable: false,
       actionLabel,
@@ -174,7 +205,7 @@ export function useBackendProbe() {
   useEffect(() => {
     let cancelled = false;
     const start = async () => {
-      if (pageIsLoopback()) {
+      if (!pageNeedsConsent()) {
         probe();
         return;
       }
