@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
 import { SolverStatus } from '../components/SolverStatus';
 import { LabCoachMark } from '../components/LabCoachMark';
-import type { CpPoint } from '../components/CpPolarChart';
+import type { CpPoint } from '../components/CpDistributionChart';
 import { SAMPLE_LOWER, SAMPLE_UPPER, sectionNormalForce, summarizeCp, type DerivedCp } from '../lib/cp';
 import { fallbackFields, resolveField, type FieldInfo } from '../lib/fields';
 import { fmtProbe, freeStream, formatRe, type ProbeSample } from '../lib/probe';
@@ -10,8 +10,8 @@ import { fmtProbe, freeStream, formatRe, type ProbeSample } from '../lib/probe';
 const CfdVtkViewer = lazy(() =>
   import('../components/CfdVtkViewer').then((m) => ({ default: m.CfdVtkViewer }))
 );
-const CpPolarChart = lazy(() =>
-  import('../components/CpPolarChart').then((m) => ({ default: m.CpPolarChart }))
+const CpDistributionChart = lazy(() =>
+  import('../components/CpDistributionChart').then((m) => ({ default: m.CpDistributionChart }))
 );
 
 type ViewerState = 'loading' | 'ready' | 'error';
@@ -47,8 +47,6 @@ export function CfdLab({
   backendOnline, solverAvailable, field, onFieldChange,
   sceneLabel, cp, cpFromJob, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed, onProbe, lastProbe, focusRequest,
 }: Props) {
-  const stream = freeStream(speed);
-
   const [fields, setFields] = useState<FieldInfo[]>(fallbackFields);
   const [datasetCp, setDatasetCp] = useState<DerivedCp | null>(null);
   const activeField = resolveField(fields, field);
@@ -63,6 +61,12 @@ export function CfdLab({
     ? undefined
     : sectionNormalForce(SAMPLE_UPPER, SAMPLE_LOWER);
 
+  // When a completed job is shown, use the solved surface's own speed estimate
+  // for the free-stream strip instead of the preview speed slider.
+  const solverSpeed =
+    usingSolverCp && datasetCp && datasetCp.uRef > 0 ? datasetCp.uRef : null;
+  const stream = freeStream(solverSpeed ?? speed);
+
   const cpSource: CpSource = usingSolverCp
     ? 'solver'
     : cpFromJob
@@ -72,10 +76,10 @@ export function CfdLab({
     : 'sample';
   const chartTitle =
     cpSource === 'solver'
-      ? 'Solved surface · Cp vs x/c'
-      : `${sceneLabel} · Cp vs x/c`;
+      ? 'Solved surface · Cp distribution (Cp vs x/c)'
+      : `${sceneLabel} · Cp distribution (Cp vs x/c)`;
   const sourceText: Record<CpSource, string> = {
-    solver: 'Solved surface pressure, normalized to Cp: (p − p_ref) / (½·U_ref²).',
+    solver: 'Pressure coefficient (Cp) derived from the solved surface pressure: (p − p_ref) / (½·U_ref²).',
     'solver-missing': 'The solved surface has no pressure field; showing the bundled sample.',
     scene: 'Generated preview · synthetic Cp, not solver output.',
     sample: 'Bundled sample · synthetic Cp, not solver output.',
@@ -143,7 +147,7 @@ export function CfdLab({
             variant="lab"
           />
           <label className="cfd-lab-field">
-            Field
+            Colour by
             <select
               value={activeField}
               onChange={(e) => onFieldChange(e.target.value)}
@@ -165,13 +169,27 @@ export function CfdLab({
       </header>
       <LabCoachMark />
       <div className="cfd-lab-freestream" aria-label="Free-stream conditions">
-        <span title="Free-stream velocity">U∞ {stream.speed.toFixed(1)} m/s</span>
+        <span
+          title={
+            solverSpeed
+              ? 'Estimated from the solved surface (maximum velocity magnitude), not the case inlet'
+              : 'Preview-model free-stream velocity; a live solve uses its own case inlet'
+          }
+        >
+          U∞ {stream.speed.toFixed(1)} m/s{solverSpeed ? ' (data)' : ''}
+        </span>
         <span title="Reference chord">c {stream.chord.toFixed(1)} m</span>
         <span title="Reynolds number based on chord">Re {formatRe(stream.reynolds)}</span>
         <span title="Dynamic pressure">q∞ {Math.round(stream.dynamicPressure)} Pa</span>
         <span title="Static temperature">T∞ {stream.temperature.toFixed(0)} K</span>
         {sectionCn !== undefined && Number.isFinite(sectionCn) && (
-          <span title="Section normal-force coefficient integrated from the plotted Cp (post-processed, not solver output)">
+          <span
+            title={
+              usingSolverCp
+                ? 'Normal-force coefficient integrated from the solved surface Cp'
+                : 'Section normal-force coefficient integrated from the plotted Cp (post-processed, not solver output)'
+            }
+          >
             Cn {sectionCn.toFixed(3)}
           </span>
         )}
@@ -217,7 +235,7 @@ export function CfdLab({
         <div className="cfd-chart-cell">
           {effectiveCp ? (
             <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
-              <CpPolarChart
+              <CpDistributionChart
                 upper={effectiveCp.upper}
                 lower={effectiveCp.lower}
                 title={chartTitle}
@@ -227,7 +245,7 @@ export function CfdLab({
             <div className="cfd-chart-note">{chartNote}</div>
           ) : (
             <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
-              <CpPolarChart
+              <CpDistributionChart
                 upper={cpData.upper}
                 lower={cpData.lower}
                 title={chartTitle}
@@ -283,6 +301,24 @@ export function CfdLab({
           </tbody>
         </table>
       </div>
+
+      <details className="cfd-glossary">
+        <summary>What am I looking at?</summary>
+        <dl>
+          <dt>Colour by</dt>
+          <dd>Maps one field to colour; the legend shows its low-to-high range. Vector fields are shown by magnitude.</dd>
+          <dt>Probe</dt>
+          <dd>Samples one point: click the surface, or move the probe-station slider. The canvas card and the table show the values.</dd>
+          <dt>Velocity vectors</dt>
+          <dd>Arrow glyphs showing the stored velocity direction, coloured by speed |U|. These are surface vectors, not streamlines.</dd>
+          <dt>Cp distribution</dt>
+          <dd>Pressure coefficient (Cp) against chord position (x/c). A completed live job derives it from the solved surface pressure; previews use synthetic data.</dd>
+          <dt>Live solve vs preview</dt>
+          <dd>Live solve runs simpleFoam on the bundled 2D channel case. NACA and uploaded models are synthetic previews, not solver results.</dd>
+          <dt>Export</dt>
+          <dd>VTP (VTK PolyData) is the mesh plus fields; CSV (comma-separated values) is the point table; probe JSON adds the free-stream and probe context.</dd>
+        </dl>
+      </details>
 
       <p className="cfd-lab-credit">
         {sceneLabel}

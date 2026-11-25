@@ -292,7 +292,7 @@ export function ModelUploader({ content, onChange, flow, onFlowChange }: Props) 
       {/* Flow toggle */}
       <div className="sidebar-section">
         <div className="sidebar-section-label">
-          Airflow overlay
+          Potential-flow particles
         </div>
         <label className="toggle-row">
           <input
@@ -301,7 +301,7 @@ export function ModelUploader({ content, onChange, flow, onFlowChange }: Props) 
             onChange={(e) => onFlowChange(e.target.checked)}
           />
           <span className="toggle-label">
-            {flow ? 'On — particles animated' : 'Off — model only'}
+            {flow ? 'On — illustrative particles' : 'Off — model only'}
           </span>
         </label>
       </div>

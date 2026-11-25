@@ -93,7 +93,7 @@ export function Hero({ content, flow, speed, rotationX, rotationY, rotationZ, ta
             <p className="hero-tagline">CFD, CAD, and 3D tools for engineering research.</p>
             <div className="hero-actions">
               <a href="#cfd" className="hero-cta-primary" onPointerEnter={onPrefetchLab} onFocus={onPrefetchLab}>Open 3D CFD Lab ↓</a>
-              <a href="#readme" className="hero-cta-secondary">Read the paper ↓</a>
+              <a href="#readme" className="hero-cta-secondary">Read the docs ↓</a>
             </div>
             <a href="#cfd" className="hero-lab-preview" aria-label="Open the 3D CFD lab: Live sample wing · 3D lab" onPointerEnter={onPrefetchLab} onFocus={onPrefetchLab}>
               <img src={POSTER} alt="3D CFD lab sample wing" loading="lazy" />

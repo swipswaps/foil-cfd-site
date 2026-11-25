@@ -135,8 +135,9 @@ export function Sidebar({
           <span className="speed-value">{speed.toFixed(1)}×</span>
         </div>
         <div className="flow-approx">
-          Potential-flow visualization. Rotate the object to change
-          its angle to the wind. For real CFD, use the CAD editor.
+          Illustrative potential-flow particles. Rotate the object to change
+          its angle to the wind. For real CFD, run a live solve from
+          Scientific tools.
         </div>
       </div>
 

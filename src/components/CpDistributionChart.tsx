@@ -22,9 +22,10 @@ interface Props {
   title?: string;
 }
 
-export function CpPolarChart({
+/** A chordwise pressure-coefficient distribution (Cp vs x/c), not a polar. */
+export function CpDistributionChart({
   upper = SAMPLE_UPPER, lower = SAMPLE_LOWER,
-  title = 'Pressure Coefficient · Cp vs x/c',
+  title = 'Pressure coefficient distribution (Cp vs x/c)',
 }: Props) {
   return (
     <section className="cfd-chart">

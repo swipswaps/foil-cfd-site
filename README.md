@@ -138,7 +138,7 @@ Push to `main`; CI builds, runs e2e, and deploys Pages.
 
 ## Repo layout
 - `src/sections/` — Hero, CfdLab, HydroLab, ProjectShowcase, ReadmeSection
-- `src/components/` — NavBar, Sidebar, BackendBadge, CpPolarChart, CfdVtkViewer, ...
+- `src/components/` — NavBar, Sidebar, BackendBadge, CpDistributionChart, CfdVtkViewer, ...
 - `src/hooks/useBackendProbe.ts` — online/offline detection (reads `VITE_BACKEND_URL`)
 - `src/lib/backendFetch.ts` — LNA `targetAddressSpace` helper
 - `backend/` — FastAPI app, `cfd_analysis.py`, `job_retention.py`, `cases/naca0012/`

@@ -317,7 +317,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(page.locator('.cfd-sidebar-probe')).toContainText(/No probe yet/);
   });
 
-  test('flow vectors overlay toggles and changes the render', async ({ page }) => {
+  test('velocity vectors overlay toggles and changes the render', async ({ page }) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(HOME, { waitUntil: 'load' });
@@ -326,11 +326,12 @@ test.describe('3D lab UX (static, no backend)', () => {
     await centerCanvas(page);
     const offShot = await page.screenshot({ clip: roundBox((await canvas.boundingBox())!) });
 
-    const btn = page.getByRole('button', { name: 'Flow vectors' });
+    const btn = page.getByRole('button', { name: 'Velocity vectors' });
     await expect(btn).toHaveAttribute('aria-pressed', 'false');
     await btn.click();
     await expect(btn).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('.cfd-vtk-announce')).toContainText(/Flow vectors on · \d+ glyphs/);
+    await expect(page.locator('.cfd-vtk-announce')).toContainText(/Velocity vectors on · \d+ glyphs/);
+    await expect(page.locator('.cfd-vectors-note')).toContainText(/Surface velocity vectors · colour = speed \|U\|/);
 
     await centerCanvas(page);
     await page.waitForTimeout(600);
@@ -339,7 +340,8 @@ test.describe('3D lab UX (static, no backend)', () => {
 
     await btn.click();
     await expect(btn).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.locator('.cfd-vtk-announce')).toContainText(/Flow vectors off/);
+    await expect(page.locator('.cfd-vtk-announce')).toContainText(/Velocity vectors off/);
+    await expect(page.locator('.cfd-vectors-note')).toHaveCount(0);
   });
 
   test('phone layout stacks without horizontal overflow', async ({ page }) => {
@@ -422,7 +424,9 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(badge.locator('.solver-label')).not.toContainText(/docker compose|127\.0\.0\.1|OpenFOAM/i);
 
     await page.getByRole('button', { name: /open sidebar/i }).first().click();
-    const tools = page.locator('.sidebar-section').filter({ hasText: 'Scientific tools' }).first();
+    const tools = page.locator('.sidebar-section').filter({
+      has: page.locator('.sidebar-section-label', { hasText: 'Scientific tools' }),
+    }).first();
     await expect(tools.locator('.sidebar-section-label')).not.toContainText(/docker compose|127\.0\.0\.1|OpenFOAM/i);
     await expect(tools.getByRole('button', { name: /Connect local backend/i })).toBeVisible();
 
@@ -460,6 +464,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     await waitForLab(page);
 
     await expect(page.locator('.cfd-chart-summary').first()).toContainText(/Peak suction Cp/);
+    await expect(page.locator('.cfd-glossary')).toContainText(/Velocity vectors/);
 
     const station = page.locator('.cfd-station input[type="range"]').first();
     await station.scrollIntoViewIfNeeded();
@@ -602,6 +607,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(select.locator('option[value="T"]')).toHaveCount(0);
     await expect(page.locator('.cfd-chart-source')).toContainText(/Solved surface pressure/i);
     await expect(page.locator('.cfd-lab-freestream')).toContainText(/Cn\s*-?\d/);
+    await expect(page.locator('.cfd-lab-freestream')).toContainText(/U∞\s*[\d.]+\s*m\/s\s*\(data\)/);
   });
 
   test('URL state restores field, NACA code and speed after reload', async ({ page }) => {

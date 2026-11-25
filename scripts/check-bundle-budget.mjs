@@ -33,7 +33,7 @@ function parseArgs(argv) {
   return out;
 }
 
-const LAB_PREFIXES = ['CfdVtkViewer-', 'CpPolarChart-', 'CfdLab-'];
+const LAB_PREFIXES = ['CfdVtkViewer-', 'CpDistributionChart-', 'CfdLab-'];
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'));

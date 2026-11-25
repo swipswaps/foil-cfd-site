@@ -252,6 +252,8 @@ do_commit() {
     src/App.tsx \
     src/components/BackendBadge.tsx \
     src/components/CfdVtkViewer.tsx \
+    src/components/CpDistributionChart.tsx \
+    src/components/CpPolarChart.tsx \
     src/components/LabCoachMark.tsx \
     src/components/ModelUploader.tsx \
     src/components/NavBar.tsx \
@@ -282,7 +284,7 @@ do_commit() {
     say "nothing staged; already committed"
     return 0
   fi
-  git -C "$REPO" commit -m "build: enforce recorded JS budget (largest chunk, lab initial, total)"
+  git -C "$REPO" commit -m "ux: industry terminology pass (velocity vectors, colour by, Cp distribution, honest freestream)"
   say "revert with: git -C \"$REPO\" revert $(git -C "$REPO" rev-parse HEAD)"
 }
 

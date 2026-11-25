@@ -293,7 +293,7 @@ export function HydroApp() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.15rem' }}>
             {[
               { name: 'Community Open-Core', price: '$0 / forever', desc: 'Browser 3D hydrofoil preview, cavitation number calculator, and self-hosted Docker connector.', cta: 'Active in Browser' },
-              { name: 'Custom Shaper White-Label', price: 'Contact for scope', desc: 'Embeddable foil configurator for e-foil and yacht brands, with export handled on your own host.', cta: 'Book Shaper Demo' }
+              { name: 'Custom Shaper White-Label', price: 'Contact for scope', desc: 'Embeddable foil configurator for e-foil and yacht brands, with export handled on your own host.', cta: 'Ask via GitHub', href: 'https://github.com/swipswaps/foil-cfd-site/issues' }
             ].map((tier) => (
               <div key={tier.name} style={{ background: '#081A2C', border: '1px solid #16324F', borderRadius: '10px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
                 <div>
@@ -301,7 +301,20 @@ export function HydroApp() {
                   <div style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.35rem 0 0.6rem' }}>{tier.price}</div>
                   <p style={{ fontSize: '0.86rem', color: '#94C3DF', lineHeight: 1.5, margin: 0 }}>{tier.desc}</p>
                 </div>
-                <button style={{ background: '#0EA5E9', color: '#04101D', border: 'none', borderRadius: '6px', padding: '0.55rem 0.9rem', fontWeight: 600, cursor: 'pointer' }}>{tier.cta}</button>
+                {'href' in tier ? (
+                  <a
+                    href={tier.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ background: '#0EA5E9', color: '#04101D', border: 'none', borderRadius: '6px', padding: '0.55rem 0.9rem', fontWeight: 600, cursor: 'pointer', textDecoration: 'none', textAlign: 'center' }}
+                  >
+                    {tier.cta}
+                  </a>
+                ) : (
+                  <span style={{ background: '#0F2942', color: '#7DD3FC', border: '1px solid #1E4976', borderRadius: '6px', padding: '0.55rem 0.9rem', fontWeight: 600, textAlign: 'center' }}>
+                    {tier.cta}
+                  </span>
+                )}
               </div>
             ))}
           </div>

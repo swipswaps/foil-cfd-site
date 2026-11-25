@@ -6,7 +6,7 @@ export interface FieldInfo {
 
 const LABELS: Record<string, string> = {
   p: 'Pressure (p)',
-  U: 'Velocity (U)',
+  U: 'Velocity magnitude (|U|)',
   T: 'Temperature (T)',
   k: 'Turbulent kinetic energy (k)',
   epsilon: 'Turbulence dissipation (epsilon)',

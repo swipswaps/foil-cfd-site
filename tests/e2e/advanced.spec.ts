@@ -180,12 +180,12 @@ test.describe('device detection', () => {
 });
 
 test.describe('lazy loading', () => {
-  test('CpPolarChart (Plotly) loads for the static demo', async ({ page }) => {
+  test('CpDistributionChart (Plotly) loads for the static demo', async ({ page }) => {
     const reqs: string[] = [];
     page.on('request', r => reqs.push(r.url()));
     await page.goto(HOME, { waitUntil: 'load' });
     await page.waitForTimeout(4000);
-    expect.soft(reqs.filter(u => /CpPolarChart/.test(u)).length).toBeGreaterThan(0);
+    expect.soft(reqs.filter(u => /CpDistributionChart/.test(u)).length).toBeGreaterThan(0);
   });
 
   test('CfdVtkViewer chunk loads when lab section is reached', async ({ page }) => {

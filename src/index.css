@@ -1780,3 +1780,36 @@ body.sidebar-locked { overflow: hidden; }
   padding: 0.2rem 0.55rem;
   font-size: 0.68rem;
 }
+
+/* Clarity for the surface velocity overlay */
+.cfd-vectors-note {
+  font-size: 0.64rem;
+  color: #7FB6D4;
+  align-self: center;
+}
+
+/* Lab glossary: what/why/how for each control */
+.cfd-glossary {
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
+  color: #94C3DF;
+}
+.cfd-glossary summary {
+  cursor: pointer;
+  color: #5BC0EB;
+  font-weight: 600;
+}
+.cfd-glossary dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0.5rem 0 0;
+}
+.cfd-glossary dt {
+  color: #BAE6FD;
+  font-weight: 600;
+}
+.cfd-glossary dd {
+  margin: 0;
+  line-height: 1.45;
+}

@@ -147,6 +147,8 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
   const [announcement, setAnnouncement] = useState('');
   const [showVectors, setShowVectors] = useState(false);
   const showVectorsRef = useRef(false);
+  const [hasVectors, setHasVectors] = useState(false);
+  const [vectorScale, setVectorScale] = useState<{ lo: number; hi: number } | null>(null);
   const glyphRef = useRef<{
     actor: ReturnType<typeof vtkActor.newInstance>;
     mapper: ReturnType<typeof vtkMapper.newInstance>;
@@ -177,7 +179,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     }
     const u = data.getPointData().getArrayByName('U');
     if (!u) {
-      setAnnouncement('Flow vectors unavailable: no U array');
+      setAnnouncement('Velocity vectors unavailable: this dataset has no U field');
       render();
       return;
     }
@@ -194,7 +196,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       }
     }
     if (sampled.length === 0 || maxU <= 0) {
-      setAnnouncement('Flow vectors: no non-zero velocities');
+      setAnnouncement('Velocity vectors: no non-zero velocities');
       render();
       return;
     }
@@ -282,8 +284,9 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     );
     vtk.view.getRenderer().addActor(actor);
     glyphRef.current = { actor, mapper, ctf };
+    setVectorScale({ lo: 0, hi: maxU });
     render();
-    setAnnouncement(`Flow vectors on · ${sampled.length} glyphs · colour = |U|`);
+    setAnnouncement(`Velocity vectors on · ${sampled.length} glyphs · colour = speed |U|`);
   };
 
   // No dependency array on purpose: sync every render so the load effect
@@ -300,7 +303,10 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     showVectorsRef.current = next;
     setShowVectors(next);
     rebuildVectors(dataRef.current, next);
-    if (!next) setAnnouncement('Flow vectors off');
+    if (!next) {
+      setVectorScale(null);
+      setAnnouncement('Velocity vectors off');
+    }
   };
 
   const projectProbe = () => {
@@ -442,6 +448,14 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
         );
         fieldsRef.current = available;
         if (datasetChanged) {
+          const hasU = available.some((f) => f.name === 'U');
+          setHasVectors(hasU);
+          if (!hasU && showVectorsRef.current) {
+            showVectorsRef.current = false;
+            setShowVectors(false);
+            setVectorScale(null);
+            clearGlyphs();
+          }
           onFieldsChangeRef.current?.(available);
           // Derive a Cp distribution from the loaded surface so a completed job
           // drives the chart instead of the synthetic preview curve.
@@ -604,21 +618,51 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
   const exportCsv = () => {
     const data = dataRef.current;
     if (!data) return;
-    const n = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : 'na');
     const pts = data.getPoints().getData();
     const pd = data.getPointData();
-    const comp = (name: string, tuple: number, component: number) => {
-      const arr = pd.getArrayByName(name);
-      return arr ? arr.getComponent(tuple, component) : 0;
+    const fields = fieldsRef.current;
+    const suffixes = ['x', 'y', 'z'];
+    const columns = ['x', 'y', 'z'];
+    for (const f of fields) {
+      const arr = pd.getArrayByName(f.name);
+      if (!arr) continue;
+      if (f.kind === 'vector') {
+        const comps = typeof arr.getNumberOfComponents === 'function' ? arr.getNumberOfComponents() : 3;
+        for (let c = 0; c < comps; c += 1) columns.push(`${f.name}${suffixes[c] ?? c}`);
+      } else {
+        columns.push(f.name);
+      }
+    }
+    const cell = (arr: VtkArrayLike | null, tuple: number, component: number) => {
+      const v = arr ? arr.getComponent(tuple, component) : Number.NaN;
+      return Number.isFinite(v) ? String(v) : 'na';
     };
-    const rows = probe
-      ? [`# probe x=${fmtProbe(probe.x, 3)} y=${fmtProbe(probe.y, 3)} z=${fmtProbe(probe.z, 3)} p=${fmtProbe(probe.p)} U=${fmtProbe(probe.u)} T=${fmtProbe(probe.t)}`, 'x,y,z,p,Ux,Uy,Uz,T']
-      : ['x,y,z,p,Ux,Uy,Uz,T'];
-    for (let i = 0; i < data.getNumberOfPoints(); i++) {
+    const rows: string[] = [];
+    if (probe) {
       rows.push(
-        `${pts[i * 3]},${pts[i * 3 + 1]},${pts[i * 3 + 2]},${comp('p', i, 0)},${comp('U', i, 0)},${comp('U', i, 1)},${comp('U', i, 2)},${comp('T', i, 0)}`,
+        `# probe x=${fmtProbe(probe.x, 3)} y=${fmtProbe(probe.y, 3)} z=${fmtProbe(probe.z, 3)} p=${fmtProbe(probe.p)} U=${fmtProbe(probe.u)} T=${fmtProbe(probe.t)}`,
       );
     }
+    rows.push(columns.join(','));
+    for (let i = 0; i < data.getNumberOfPoints(); i += 1) {
+      const values = [
+        String(pts[i * 3]),
+        String(pts[i * 3 + 1]),
+        String(pts[i * 3 + 2]),
+      ];
+      for (const f of fields) {
+        const arr = pd.getArrayByName(f.name);
+        if (!arr) continue;
+        if (f.kind === 'vector') {
+          const comps = typeof arr.getNumberOfComponents === 'function' ? arr.getNumberOfComponents() : 3;
+          for (let c = 0; c < comps; c += 1) values.push(cell(arr, i, c));
+        } else {
+          values.push(cell(arr, i, 0));
+        }
+      }
+      rows.push(values.join(','));
+    }
+    const n = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : 'na');
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -820,15 +864,23 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
           >
             Export probe JSON
           </button>
-          <button
-            type="button"
-            onClick={toggleVectors}
-            aria-pressed={showVectors}
-            title="Overlay sampled surface velocity vectors, coloured by |U| (light-path view, not volume streamlines)"
-          >
-            Flow vectors
-          </button>
+          {hasVectors && (
+            <button
+              type="button"
+              onClick={toggleVectors}
+              aria-pressed={showVectors}
+              title="Surface velocity vectors (arrow glyphs): direction as stored in the data, colour = speed |U|; not streamlines"
+            >
+              Velocity vectors
+            </button>
+          )}
           <span className="cfd-vtk-hint">Click surface to probe</span>
+          {showVectors && (
+            <span className="cfd-vectors-note">
+              Surface velocity vectors · colour = speed |U|
+              {vectorScale ? ` ${vectorScale.lo.toFixed(2)}–${vectorScale.hi.toFixed(2)}` : ''}
+            </span>
+          )}
         </div>
       </header>
       <span className="sr-only cfd-vtk-announce" role="status" aria-live="polite">
@@ -837,7 +889,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       <div
         className="cfd-vtk-canvas"
         role="img"
-        aria-label={`3D CFD surface, ${field.toUpperCase()} field. Click the surface to sample p, U and T.`}
+        aria-label={`3D CFD surface, colour by ${field}. Click the surface to probe the available fields.`}
         tabIndex={0}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
