@@ -243,7 +243,7 @@ do_commit() {
   ( cd "$REPO" && npm run typecheck )
   run_offline_e2e
   say "== stage UX changes =="
-  git -C "$REPO" add -- \
+  git -C "$REPO" add -A -- \
     .github/workflows/deploy.yml \
     README.md \
     package.json \
@@ -253,7 +253,6 @@ do_commit() {
     src/components/BackendBadge.tsx \
     src/components/CfdVtkViewer.tsx \
     src/components/CpDistributionChart.tsx \
-    src/components/CpPolarChart.tsx \
     src/components/LabCoachMark.tsx \
     src/components/ModelUploader.tsx \
     src/components/NavBar.tsx \
