@@ -141,8 +141,11 @@ async function loadModelFile(file: File): Promise<{
 }
 
 export function ModelUploader({ content, onChange, flow, onFlowChange }: Props) {
-  const [selectedNaca, setSelectedNaca] = useState<string>('custom');
-  const [customNaca, setCustomNaca] = useState('4415');
+  const restoredNaca = content.kind === 'naca' ? content.code : null;
+  const [selectedNaca, setSelectedNaca] = useState<string>(() =>
+    restoredNaca && NACA_PRESETS.some((p) => p.code === restoredNaca) ? restoredNaca : 'custom',
+  );
+  const [customNaca, setCustomNaca] = useState(restoredNaca ?? '4415');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);

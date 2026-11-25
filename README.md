@@ -60,7 +60,9 @@ work to make it a real solver-backed tool, in the order it happened:
   and its analysis plus `surface.vtp` are shown. The Field menu is discovered
   from the dataset (so a solved case offers `k`, `epsilon`, and `nut`, and drops
   `T` when it is absent), and a completed job drives the Cp chart and `Cn` from
-  the solved surface pressure instead of the synthetic preview curve.
+  the solved surface pressure instead of the synthetic preview curve. The lab
+  view (field, NACA code, speed, flow toggle, rotations, and job id) is mirrored
+  into the URL, and **Copy link** reproduces it in another tab.
 - **Bundled case is a 2D channel placeholder** (`backend/cases/naca0012/`), named
   for API compatibility but not a NACA airfoil mesh. It exists so the image can
   run a real, fast `simpleFoam` solve end to end.

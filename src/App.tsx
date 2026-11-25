@@ -11,6 +11,7 @@ import { useSketchForgeProbe } from './hooks/useSketchForgeProbe';
 import { backendFetch } from './lib/backendFetch';
 import type { SceneContent } from './data/scene';
 import { buildSceneLab, type SceneLab } from './lib/sceneVtp';
+import { buildLabSearch, parseLabUrl } from './lib/labUrl';
 import type { ProbeSample } from './lib/probe';
 
 export type CfdField = string;
@@ -86,22 +87,33 @@ export default function App() {
   const backend = useBackendProbe();
   const cad = useSketchForgeProbe();
 
+  const initialUrl = useMemo(
+    () => parseLabUrl(typeof window === 'undefined' ? '' : window.location.search),
+    [],
+  );
+
   const [devicePick, setDevicePick] = useState<DevicePick>(() => detectDevice());
   const [detectedDevice, setDetectedDevice] = useState<DetectedDevice>(detectDevice);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [heroTab, setHeroTab] = useState<'overview' | 'lab'>('overview');
+  const [heroTab, setHeroTab] = useState<'overview' | 'lab'>(() =>
+    typeof window !== 'undefined' && window.location.hash === '#cfd' ? 'lab' : 'overview',
+  );
   const [lastProbe, setLastProbe] = useState<ProbeSample | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ sample: ProbeSample; nonce: number } | null>(null);
-  const [sceneContent, setSceneContent] = useState<SceneContent>({ kind: 'default', token: 0 });
-  const [flow, setFlow] = useState(true);
-  const [speed, setSpeed] = useState(2.0);
-  const [rotationX, setRotationX] = useState(0);
-  const [rotationY, setRotationY] = useState(0);
-  const [rotationZ, setRotationZ] = useState(0);
+  const [sceneContent, setSceneContent] = useState<SceneContent>(() =>
+    initialUrl.naca
+      ? { kind: 'naca', code: initialUrl.naca, token: 1 }
+      : { kind: 'default', token: 0 },
+  );
+  const [flow, setFlow] = useState(() => initialUrl.flow ?? true);
+  const [speed, setSpeed] = useState(() => initialUrl.speed ?? 2.0);
+  const [rotationX, setRotationX] = useState(() => initialUrl.rotX ?? 0);
+  const [rotationY, setRotationY] = useState(() => initialUrl.rotY ?? 0);
+  const [rotationZ, setRotationZ] = useState(() => initialUrl.rotZ ?? 0);
 
-  const [cfdField, setCfdField] = useState<CfdField>(initialField);
-  const [cfdJobId, setCfdJobId] = useState<string | null>(null);
-  const [cfdJobStatus, setCfdJobStatus] = useState<string>('idle');
+  const [cfdField, setCfdField] = useState<CfdField>(() => initialUrl.field ?? initialField());
+  const [cfdJobId, setCfdJobId] = useState<string | null>(() => initialUrl.job ?? null);
+  const [cfdJobStatus, setCfdJobStatus] = useState<string>(() => (initialUrl.job ? 'queued' : 'idle'));
   const [cfdError, setCfdError] = useState<string | null>(null);
   const [cfdJobDatasetUrl, setCfdJobDatasetUrl] = useState<string | null>(null);
   const [cfdStartedAt, setCfdStartedAt] = useState<number | null>(null);
@@ -161,10 +173,29 @@ export default function App() {
 
   const handleHeroTab = (tab: 'overview' | 'lab') => {
     setHeroTab(tab);
-    const url = tab === 'lab' ? '#cfd' : `${window.location.pathname}${window.location.search}`;
-    window.history.replaceState(null, '', url);
     if (tab === 'overview') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Keep shareable lab state in the URL. The `#cfd` hash still marks the lab
+  // tab; other anchors (for example #projects) are preserved.
+  useEffect(() => {
+    const search = buildLabSearch({
+      field: cfdField,
+      naca: sceneContent.kind === 'naca' ? sceneContent.code : undefined,
+      speed,
+      flow,
+      rotX: rotationX,
+      rotY: rotationY,
+      rotZ: rotationZ,
+      job: cfdJobId ?? undefined,
+    });
+    const currentHash = window.location.hash;
+    const hash =
+      heroTab === 'lab' ? '#cfd' : currentHash === '#cfd' ? '' : currentHash;
+    const next = `${window.location.pathname}${search}${hash}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (next !== current) window.history.replaceState(null, '', next);
+  }, [cfdField, sceneContent, speed, flow, rotationX, rotationY, rotationZ, cfdJobId, heroTab]);
 
   const effectiveDevice: DetectedDevice =
     devicePick === 'auto' ? detectedDevice : devicePick;
@@ -224,6 +255,13 @@ export default function App() {
     const poll = async () => {
       try {
         const res = await backendFetch(`${origin}/api/jobs/${cfdJobId}`);
+        if (res.status === 404) {
+          if (cancelled) return;
+          setCfdJobStatus('failed');
+          setCfdConnectionLost(false);
+          setCfdError('That saved job is no longer available. Run a new solve.');
+          return;
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (cancelled) return;

@@ -1773,3 +1773,10 @@ body.sidebar-locked { overflow: hidden; }
   color: #5E8FA8;
   font-style: italic;
 }
+
+/* Shareable view: Copy link sits with the lab controls */
+.cfd-share-btn {
+  min-height: 28px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.68rem;
+}

@@ -85,6 +85,31 @@ export function CfdLab({
   const [slowLoad, setSlowLoad] = useState(false);
   const [station, setStation] = useState(0.3);
   const [stationNonce, setStationNonce] = useState(0);
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = async () => {
+    const href = window.location.href;
+    try {
+      await navigator.clipboard.writeText(href);
+      setCopied(true);
+    } catch {
+      try {
+        const field = document.createElement('textarea');
+        field.value = href;
+        field.setAttribute('readonly', '');
+        field.style.position = 'fixed';
+        field.style.opacity = '0';
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand('copy');
+        field.remove();
+        setCopied(true);
+      } catch {
+        setCopied(false);
+      }
+    }
+    window.setTimeout(() => setCopied(false), 1500);
+  };
 
   useEffect(() => {
     if (viewerState === 'ready') return;
@@ -128,6 +153,14 @@ export function CfdLab({
               ))}
             </select>
           </label>
+          <button
+            type="button"
+            className="upload-btn cfd-share-btn"
+            onClick={copyLink}
+            title="Copy a link that restores this lab view"
+          >
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
         </div>
       </header>
       <LabCoachMark />

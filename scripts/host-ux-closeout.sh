@@ -244,6 +244,7 @@ do_commit() {
     src/components/BackendBadge.tsx \
     src/components/CfdVtkViewer.tsx \
     src/components/LabCoachMark.tsx \
+    src/components/ModelUploader.tsx \
     src/components/NavBar.tsx \
     src/components/Sidebar.tsx \
     src/components/SolverStatus.tsx \
@@ -251,6 +252,7 @@ do_commit() {
     src/index.css \
     src/lib/cp.ts \
     src/lib/fields.ts \
+    src/lib/labUrl.ts \
     src/lib/probe.ts \
     src/lib/solverStatus.ts \
     src/sections/CfdLab.tsx \
@@ -269,7 +271,7 @@ do_commit() {
     say "nothing staged; already committed"
     return 0
   fi
-  git -C "$REPO" commit -m "a11y: axe gate for overview+lab; fix hero label-in-name and persistent h1"
+  git -C "$REPO" commit -m "ux: shareable lab URL (field/naca/speed/job) + copy link"
   say "revert with: git -C \"$REPO\" revert $(git -C "$REPO" rev-parse HEAD)"
 }
 

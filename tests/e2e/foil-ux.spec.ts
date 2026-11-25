@@ -603,4 +603,58 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(page.locator('.cfd-chart-source')).toContainText(/Solved surface pressure/i);
     await expect(page.locator('.cfd-lab-freestream')).toContainText(/Cn\s*-?\d/);
   });
+
+  test('URL state restores field, NACA code and speed after reload', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+
+    await page.getByRole('button', { name: /open sidebar/i }).first().click();
+    await page.getByLabel('NACA 4-digit code').fill('2412');
+    await page.locator('.upload-row').getByRole('button', { name: 'Apply' }).first().click();
+    await page.locator('#flow-speed').evaluate((el) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(el, '3.5');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.keyboard.press('Escape');
+    await openLab(page);
+    await page.locator('.cfd-lab-field select').selectOption('T');
+
+    await expect.poll(() => new URL(page.url()).searchParams.get('naca')).toBe('2412');
+    await expect.poll(() => new URL(page.url()).searchParams.get('field')).toBe('T');
+    await expect.poll(() => new URL(page.url()).searchParams.get('speed')).toBe('3.5');
+
+    const shareUrl = page.url();
+    await page.goto(shareUrl, { waitUntil: 'load' });
+    await openLab(page);
+    await expect(page.locator('.cfd-lab-field select')).toHaveValue('T');
+    await expect(page.locator('#cfd').getByText(/NACA 2412/).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.cfd-lab-freestream')).toContainText(/U∞\s*3\.5\s*m\/s/);
+  });
+
+  test('copy link reopens the same view', async ({ page, context }) => {
+    test.setTimeout(180_000);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
+      origin: new URL(HOME).origin,
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    await openLab(page);
+    await page.locator('.cfd-lab-field select').selectOption('U');
+    await expect.poll(() => new URL(page.url()).searchParams.get('field')).toBe('U');
+
+    await page.getByRole('button', { name: /Copy link/i }).click();
+    await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible({ timeout: 5000 });
+
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toContain('field=U');
+
+    const second = await context.newPage();
+    await second.goto(copied, { waitUntil: 'load' });
+    await expect(second.locator('#cfd')).toBeVisible({ timeout: 15000 });
+    await expect(second.locator('.cfd-lab-field select')).toHaveValue('U');
+    await second.close();
+  });
 });
