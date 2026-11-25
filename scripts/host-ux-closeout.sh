@@ -260,6 +260,7 @@ do_commit() {
     src/components/SolverStatus.tsx \
     src/hooks/useBackendProbe.ts \
     src/index.css \
+    src/lib/analysis.ts \
     src/lib/cp.ts \
     src/lib/fields.ts \
     src/lib/labUrl.ts \
@@ -283,7 +284,7 @@ do_commit() {
     say "nothing staged; already committed"
     return 0
   fi
-  git -C "$REPO" commit -m "ux: industry terminology pass (velocity vectors, colour by, Cp distribution, honest freestream)"
+  git -C "$REPO" commit -m "ux: surface solver summary from /analysis (source, fields, |U| stats)"
   say "revert with: git -C \"$REPO\" revert $(git -C "$REPO" rev-parse HEAD)"
 }
 

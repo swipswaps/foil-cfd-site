@@ -587,6 +587,20 @@ test.describe('3D lab UX (static, no backend)', () => {
     await page.route('**/api/jobs/testjob/surface.vtp', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/octet-stream', body: makeVtp(VTP_PUK) });
     });
+    await page.route('**/api/jobs/testjob/analysis', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          source: 'openfoam',
+          n_points: 6,
+          n_cells: 4,
+          point_fields: ['p', 'U', 'k', 'epsilon', 'nut'],
+          velocity_magnitude_mean: 0.9,
+          velocity_magnitude_max: 1.2,
+        }),
+      });
+    });
     await page.route('**/api/jobs/testjob', async (route) => {
       await route.fulfill({
         status: 200,
@@ -608,6 +622,9 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(page.locator('.cfd-chart-source')).toContainText(/Solved surface pressure/i);
     await expect(page.locator('.cfd-lab-freestream')).toContainText(/Cn\s*-?\d/);
     await expect(page.locator('.cfd-lab-freestream')).toContainText(/U∞\s*[\d.]+\s*m\/s\s*\(data\)/);
+    await expect(page.locator('.cfd-job-analysis')).toContainText(/Solver summary/);
+    await expect(page.locator('.cfd-job-analysis')).toContainText(/source openfoam/);
+    await expect(page.locator('.cfd-job-analysis')).toContainText(/\|U\| mean 0\.90, max 1\.20/);
   });
 
   test('URL state restores field, NACA code and speed after reload', async ({ page }) => {

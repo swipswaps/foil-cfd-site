@@ -6,6 +6,7 @@ import type { CpPoint } from '../components/CpDistributionChart';
 import { SAMPLE_LOWER, SAMPLE_UPPER, sectionNormalForce, summarizeCp, type DerivedCp } from '../lib/cp';
 import { fallbackFields, resolveField, type FieldInfo } from '../lib/fields';
 import { fmtProbe, freeStream, formatRe, type ProbeSample } from '../lib/probe';
+import { summarizeAnalysis, type JobAnalysis } from '../lib/analysis';
 
 const CfdVtkViewer = lazy(() =>
   import('../components/CfdVtkViewer').then((m) => ({ default: m.CfdVtkViewer }))
@@ -33,6 +34,7 @@ interface Props {
   datasetUrl: string;
   jobId: string | null;
   jobStatus: string;
+  analysis?: JobAnalysis | null;
   speed: number;
   onProbe?: (sample: ProbeSample | null) => void;
   lastProbe?: ProbeSample | null;
@@ -45,7 +47,7 @@ const FieldSkeleton = ({ label }: { label: string }) => (
 
 export function CfdLab({
   backendOnline, solverAvailable, field, onFieldChange,
-  sceneLabel, cp, cpFromJob, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed, onProbe, lastProbe, focusRequest,
+  sceneLabel, cp, cpFromJob, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, analysis, speed, onProbe, lastProbe, focusRequest,
 }: Props) {
   const [fields, setFields] = useState<FieldInfo[]>(fallbackFields);
   const [datasetCp, setDatasetCp] = useState<DerivedCp | null>(null);
@@ -196,6 +198,11 @@ export function CfdLab({
       </div>
       {jobId && (
         <div className="cfd-job-status">Job {jobId.slice(0, 8)} · {jobStatus}</div>
+      )}
+      {analysis && (
+        <div className="cfd-job-analysis" title="From the backend analysis endpoint for this completed job">
+          <strong>Solver summary</strong> · {summarizeAnalysis(analysis)}
+        </div>
       )}
       {viewerState !== 'ready' && (
         <div className="cfd-loading" role="status" aria-live="polite">

@@ -1813,3 +1813,12 @@ body.sidebar-locked { overflow: hidden; }
   margin: 0;
   line-height: 1.45;
 }
+
+/* Solver summary from the backend /analysis endpoint */
+.cfd-job-analysis {
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: #94C3DF;
+}
+.cfd-job-analysis strong { color: #BAE6FD; }

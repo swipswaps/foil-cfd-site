@@ -13,6 +13,7 @@ import type { SceneContent } from './data/scene';
 import { buildSceneLab, type SceneLab } from './lib/sceneVtp';
 import { buildLabSearch, parseLabUrl } from './lib/labUrl';
 import type { ProbeSample } from './lib/probe';
+import type { JobAnalysis } from './lib/analysis';
 
 export type CfdField = string;
 
@@ -119,6 +120,7 @@ export default function App() {
   const [cfdStartedAt, setCfdStartedAt] = useState<number | null>(null);
   const [cfdElapsed, setCfdElapsed] = useState(0);
   const [cfdConnectionLost, setCfdConnectionLost] = useState(false);
+  const [cfdAnalysis, setCfdAnalysis] = useState<JobAnalysis | null>(null);
   const [cfdPollNonce, setCfdPollNonce] = useState(0);
 
   const sceneLab = useMemo<SceneLab | null>(() => {
@@ -296,12 +298,34 @@ export default function App() {
     };
   }, [cfdJobId, backend.backendOrigin, cfdActive, cfdPollNonce]);
 
+  // Fetch the solver summary once a job completes. Kept separate from the poll
+  // so the status change to "completed" cannot cancel the supplementary fetch.
+  useEffect(() => {
+    if (cfdJobStatus !== 'completed' || !cfdJobId || !backend.backendOrigin) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await backendFetch(`${backend.backendOrigin}/api/jobs/${cfdJobId}/analysis`);
+        if (!cancelled && res.ok) {
+          setCfdAnalysis((await res.json()) as JobAnalysis);
+        }
+      } catch {
+        /* analysis is supplementary; a failure must not block the surface */
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [cfdJobStatus, cfdJobId, backend.backendOrigin]);
+
   const startCfdSolve = async () => {
     if (!backend.backendOrigin) return;
     const started = Date.now();
     setCfdError(null);
     setCfdConnectionLost(false);
     setCfdJobDatasetUrl(null);
+    setCfdAnalysis(null);
     setCfdJobStatus('submitting');
     setCfdStartedAt(started);
     setCfdElapsed(0);
@@ -434,6 +458,7 @@ export default function App() {
                   datasetUrl={labDatasetUrl}
                   jobId={backendOnline ? cfdJobId : null}
                   jobStatus={backendOnline ? cfdJobStatus : 'static'}
+                  analysis={cfdAnalysis}
                   speed={speed}
                   onProbe={setLastProbe}
                   lastProbe={lastProbe}
