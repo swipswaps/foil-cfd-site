@@ -105,6 +105,7 @@ build_same_origin() {
   if grep -q '/foil-cfd-site/assets' "$DIST/index.html"; then
     fail "dist still uses the GitHub Pages base; the same-origin app would 404"
   fi
+  ( cd "$REPO" && node scripts/check-bundle-budget.mjs )
   say "dist index base OK"
 }
 
@@ -164,11 +165,15 @@ accept_origin() {
 run_e2e() {
   say "== live tailnet e2e (--retries=0) =="
   local out rc
+  local pwout="/tmp/foil-pw-tailnet"
+  rm -rf "$pwout"
   set +e
-  out="$(cd "$REPO" && TAILNET_APP_URL="https://$TSN:$HTTPS_PORT/" \
-    npx playwright test tests/e2e/tailnet.spec.ts --project=desktop-chrome --retries=0 2>&1)"
+  out="$(cd "$REPO" && PLAYWRIGHT_GATE=1 TAILNET_APP_URL="https://$TSN:$HTTPS_PORT/" \
+    npx playwright test tests/e2e/tailnet.spec.ts --project=desktop-chrome \
+      --retries=0 --reporter=line --output "$pwout" 2>&1)"
   rc=$?
   set -e
+  rm -rf "$pwout"
   printf '%s\n' "$out" | tail -n 25
   if [ "$rc" -ne 0 ]; then
     fail "tailnet e2e exited $rc"
@@ -194,6 +199,7 @@ run_offline_e2e() {
   # listening on this host (ws24 has services on 127.0.0.1:8000/8002).
   VITE_BACKEND_URL="http://127.0.0.1:$port" \
     npx vite build --outDir "$out" --emptyOutDir >/dev/null
+  ( cd "$REPO" && node scripts/check-bundle-budget.mjs --dir "$out" )
   nohup npx vite preview --outDir "$out" --port "$port" --strictPort --host 127.0.0.1 >"$log" 2>"$err" &
   pid=$!
   for i in $(seq 1 30); do
@@ -210,18 +216,20 @@ run_offline_e2e() {
     fail "offline preview did not start on port $port"
   fi
   set +e
-  PLAYWRIGHT_BASE_URL="http://127.0.0.1:$port/foil-cfd-site" \
+  rm -rf "/tmp/foil-pw-offline-$port"
+  PLAYWRIGHT_GATE=1 PLAYWRIGHT_BASE_URL="http://127.0.0.1:$port/foil-cfd-site" \
     npx playwright test \
       tests/e2e/foil-static.spec.ts \
       tests/e2e/foil-offline.spec.ts \
       tests/e2e/foil-components.spec.ts \
       tests/e2e/foil-ux.spec.ts \
       tests/e2e/foil-a11y.spec.ts \
-      --project=desktop-chrome --retries=0 --workers=1
+      --project=desktop-chrome --retries=0 --workers=1 \
+      --reporter=line --output "/tmp/foil-pw-offline-$port"
   rc=$?
   set -e
   kill -TERM "$pid" 2>/dev/null || true
-  rm -rf "$out"
+  rm -rf "$out" "/tmp/foil-pw-offline-$port"
   popd >/dev/null
   if [ "$rc" -ne 0 ]; then
     fail "offline e2e exited $rc"
@@ -240,6 +248,7 @@ do_commit() {
     README.md \
     package.json \
     package-lock.json \
+    playwright.config.ts \
     src/App.tsx \
     src/components/BackendBadge.tsx \
     src/components/CfdVtkViewer.tsx \
@@ -266,12 +275,14 @@ do_commit() {
     tests/e2e/foil-static.spec.ts \
     tests/e2e/foil-ux.spec.ts \
     tests/e2e/tailnet.spec.ts \
+    scripts/bundle-budget.json \
+    scripts/check-bundle-budget.mjs \
     scripts/host-ux-closeout.sh
   if git -C "$REPO" diff --cached --quiet; then
     say "nothing staged; already committed"
     return 0
   fi
-  git -C "$REPO" commit -m "ux: shareable lab URL (field/naca/speed/job) + copy link"
+  git -C "$REPO" commit -m "build: enforce recorded JS budget (largest chunk, lab initial, total)"
   say "revert with: git -C \"$REPO\" revert $(git -C "$REPO" rev-parse HEAD)"
 }
 

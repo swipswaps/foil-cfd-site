@@ -66,9 +66,12 @@ work to make it a real solver-backed tool, in the order it happened:
 - **Bundled case is a 2D channel placeholder** (`backend/cases/naca0012/`), named
   for API compatibility but not a NACA airfoil mesh. It exists so the image can
   run a real, fast `simpleFoam` solve end to end.
-- **CI.** `build` (npm ci, audit, lint, typecheck, build) -> `e2e` (starts the
-  docker backend, runs advanced online + static offline + component specs) ->
-  `deploy` (GitHub Pages, main only).
+- **CI.** `build` (npm ci, audit, lint, typecheck, build, JS budget check) -> `e2e`
+  (starts the docker backend, runs advanced online + static offline + component
+  specs) -> `deploy` (GitHub Pages, main only). The JS budget
+  (`scripts/check-bundle-budget.mjs`, limits in `scripts/bundle-budget.json`)
+  fails the build if the largest chunk, the lab's initial JavaScript, or total
+  JavaScript grows past the recorded transfer budget.
 - **Known limits.** Branch protection allows admin bypass (push logs "Bypassed
   rule violations"), so `e2e` is not a hard gate; the backend runs on the host and
   is not deployed by Pages; the live site is the static build.

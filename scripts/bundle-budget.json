@@ -1,0 +1,10 @@
+{
+  "recorded": "2026-11-25",
+  "reason": "The lab is lazy-loaded; its initial JavaScript is the VTK viewer plus the Plotly chart. These limits are about 10% over the measured baseline (largest gzip 425182 B, lab initial gzip 796573 B, total JS gzip 1232346 B). They exist to catch regressions, not to force a risky split of the vtk.js and Plotly vendor bundles. Gzip is the transfer metric; raw is the bundler-warning metric.",
+  "limits": {
+    "largestChunkGzipBytes": 470000,
+    "largestChunkRawBytes": 1750000,
+    "labInitialGzipBytes": 875000,
+    "totalJsGzipBytes": 1350000
+  }
+}
