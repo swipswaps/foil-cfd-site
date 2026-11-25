@@ -216,6 +216,7 @@ run_offline_e2e() {
       tests/e2e/foil-offline.spec.ts \
       tests/e2e/foil-components.spec.ts \
       tests/e2e/foil-ux.spec.ts \
+      tests/e2e/foil-a11y.spec.ts \
       --project=desktop-chrome --retries=0 --workers=1
   rc=$?
   set -e
@@ -235,7 +236,10 @@ do_commit() {
   run_offline_e2e
   say "== stage UX changes =="
   git -C "$REPO" add -- \
+    .github/workflows/deploy.yml \
     README.md \
+    package.json \
+    package-lock.json \
     src/App.tsx \
     src/components/BackendBadge.tsx \
     src/components/CfdVtkViewer.tsx \
@@ -250,8 +254,10 @@ do_commit() {
     src/lib/probe.ts \
     src/lib/solverStatus.ts \
     src/sections/CfdLab.tsx \
+    src/sections/Hero.tsx \
     src/sections/HydroLab.tsx \
     tests/e2e/advanced.spec.ts \
+    tests/e2e/foil-a11y.spec.ts \
     tests/e2e/foil-advanced.spec.ts \
     tests/e2e/foil-components.spec.ts \
     tests/e2e/foil-offline.spec.ts \
@@ -263,7 +269,7 @@ do_commit() {
     say "nothing staged; already committed"
     return 0
   fi
-  git -C "$REPO" commit -m "ux: honest solver status, reversible solve, keyboard probe, first-run guide"
+  git -C "$REPO" commit -m "a11y: axe gate for overview+lab; fix hero label-in-name and persistent h1"
   say "revert with: git -C \"$REPO\" revert $(git -C "$REPO" rev-parse HEAD)"
 }
 
