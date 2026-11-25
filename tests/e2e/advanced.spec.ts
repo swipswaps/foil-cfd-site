@@ -94,7 +94,7 @@ test.describe('home page', () => {
   test('backend status pill is a recognised state', async ({ page }) => {
     await page.goto(HOME, { waitUntil: 'load' });
     const pill = page
-      .getByText(/Backend (online|offline)|Backend unavail|Solver unavailable/i)
+      .getByText(/Live solver|Backend (online|offline)|Backend unavail|Solver unavailable|Static demo/i)
       .filter({ visible: true })
       .first();
     if (await pill.count() === 0) {
@@ -216,7 +216,7 @@ test.describe('synthetic solve', () => {
   test('offline backend exposes a synthetic-solve control', async ({ page }) => {
     await page.goto(HYDRO, { waitUntil: 'load' });
     await scrollToBottom(page);
-    const offline = await page.getByText(/Solver unavailable|Backend offline/i).filter({ visible: true }).count();
+    const offline = await page.getByText(/Solver unavailable|Backend offline|Static demo/i).filter({ visible: true }).count();
     if (offline === 0) test.skip(true, 'backend online; synthetic-solve not applicable');
     const btn = page.getByRole('button', { name: /synthetic|solve|run|start/i }).first();
     await expect.soft(btn).toBeVisible({ timeout: 5_000 });

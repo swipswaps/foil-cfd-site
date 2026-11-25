@@ -39,7 +39,7 @@ test.describe('tailnet same-origin app', () => {
 
     const badge = page.locator('.backend-badge').first();
     await expect(badge).toBeVisible({ timeout: 20_000 });
-    await expect(badge).toContainText(/Backend online/i, { timeout: 30_000 });
+    await expect(badge).toContainText(/Live solver|Backend online/i, { timeout: 30_000 });
     await expect(badge).not.toContainText(/permission|allow this site/i);
     await expect(page.getByRole('button', { name: /Connect local backend/i })).toHaveCount(0);
 

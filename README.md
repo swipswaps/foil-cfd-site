@@ -46,12 +46,21 @@ work to make it a real solver-backed tool, in the order it happened:
 
 ## Where we are now
 
-- **Static mode (default).** Works with no backend: explicit "static mode /
-  backend offline" pill, bundled demo dataset drives the charts, 3D lab renders,
-  and a **Connect local backend** action is offered.
-- **Online mode.** With a local backend, the pill turns to "Backend online" /
-  "OpenFOAM ready"; the sidebar exposes the solve control; a job is submitted to
-  `/api/solve`, polled, and its analysis + `surface.vtp` are shown.
+- **Static mode (default).** Works with no backend: an explicit "Static demo ·
+  sample wing" pill, the bundled demo dataset drives the charts, the 3D lab
+  renders, and a **Connect local backend** action is offered. The operator
+  command to self-host lives in a collapsed "Self-host the solver" disclosure,
+  not in the primary status.
+- **Online mode.** With a local backend the pill becomes "Live solver ready" (or
+  "Live solver connected · preview mode" when the CFD solver is absent) and the
+  lab header shows "Solver ready". The sidebar exposes the solve control with an
+  honest note ("Bundled 2D channel case · simpleFoam · about 30 seconds"), a
+  three-step progress indicator, elapsed seconds, a copyable job ID, best-effort
+  cancel, and retry. A job goes to `/api/solve`, is polled with bounded retries,
+  and its analysis plus `surface.vtp` are shown. The Field menu is discovered
+  from the dataset (so a solved case offers `k`, `epsilon`, and `nut`, and drops
+  `T` when it is absent), and a completed job drives the Cp chart and `Cn` from
+  the solved surface pressure instead of the synthetic preview curve.
 - **Bundled case is a 2D channel placeholder** (`backend/cases/naca0012/`), named
   for API compatibility but not a NACA airfoil mesh. It exists so the image can
   run a real, fast `simpleFoam` solve end to end.

@@ -3,6 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useBackendProbe } from '../hooks/useBackendProbe';
+import { solverStatusLabel } from '../lib/solverStatus';
 
 function pseudo(i: number, salt: number): number {
   const x = Math.sin(i * 12.9898 + salt) * 43758.5453;
@@ -202,11 +203,7 @@ export function HydroApp() {
             title={backend.status === 'offline' ? backend.reason : undefined}
             style={{ padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.78rem', font: 'inherit', cursor: backend.status === 'online' ? 'default' : 'pointer', background: backend.status === 'online' ? 'rgba(16,185,129,0.16)' : 'rgba(148,163,184,0.14)', color: backend.status === 'online' ? '#34D399' : '#94A3B8', border: `1px solid ${backend.status === 'online' ? '#059669' : '#334155'}` }}
           >
-            {backend.status === 'online'
-              ? `Local OpenFOAM/VTK Node Online (${backend.backendOrigin.replace(/^https?:\/\//, '')})`
-              : backend.status === 'probing'
-              ? 'Detecting local solver…'
-              : 'Static Cavitation Preview Mode'}
+            {solverStatusLabel(backend.status, backend.solverAvailable, 'node')}
           </button>
         </div>
       </header>
@@ -214,7 +211,7 @@ export function HydroApp() {
         <section style={{ marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2.1rem', margin: '0 0 0.6rem', color: '#F0F9FF' }}>Cavitation-Safe Hydrofoil &amp; Subsea Wing Engineering</h1>
           <p style={{ maxWidth: '780px', color: '#94C3DF', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
-            Screen e-foil wings, America&apos;s Cup T-foils, and AUV hydroplanes before cutting carbon or CNC tooling. Inspect 3D flow geometry, lift-to-drag polars, and real-time cavitation inception margins in your browser—then burst full 3D RANS meshes to your local Docker OpenFOAM solver.
+            Screen e-foil wings, America&apos;s Cup T-foils, and AUV hydroplanes before cutting carbon or CNC tooling. Inspect 3D flow geometry, lift-to-drag polars, and cavitation inception margins in your browser. This page is a screening preview: the live solver, when you run it locally, currently solves the bundled 2D channel case, not a full 3D hydrofoil mesh.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
             <button onClick={() => setParams({ speedKnots: 20, aoaDeg: 4.2, depthMeters: 0.55, spanMeters: 0.88, chordMeters: 0.15, waterTempC: 20 })} style={{ background: '#0F2942', color: '#E0F2FE', border: '1px solid #1E4976', padding: '0.45rem 0.9rem', borderRadius: '6px', cursor: 'pointer' }}>Preset: e-Foil Cruiser (20 kt)</button>
@@ -292,12 +289,11 @@ export function HydroApp() {
         </section>
         <section>
           <h2 style={{ fontSize: '1.45rem', marginBottom: '0.4rem' }}>Deployment &amp; Licensing Tiers</h2>
-          <p style={{ color: '#7FB6D4', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Local-first architecture: run free browser screening on GitHub Pages, unlock automated 3D OpenFOAM cavitation sweeps locally or on burst cloud workers.</p>
+          <p style={{ color: '#7FB6D4', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Local-first architecture: the browser screening runs free on GitHub Pages. Paid automated sweeps and cloud workers are planned, not yet purchasable; the buttons below only open a conversation.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.15rem' }}>
             {[
               { name: 'Community Open-Core', price: '$0 / forever', desc: 'Browser 3D hydrofoil preview, cavitation number calculator, and self-hosted Docker connector.', cta: 'Active in Browser' },
-              { name: 'Hydro Pro Workstation', price: '$49 / mo per seat', desc: 'Automated angle-of-attack & speed polar sweeps, snappyHexMesh boundary layers, and VTP/CSV export.', cta: 'Request Pro Key' },
-              { name: 'Custom Shaper White-Label', price: '$750 / mo', desc: 'Embeddable foil configurator for e-foil & yacht brands with validated STEP/STL manufacturing export.', cta: 'Book Shaper Demo' }
+              { name: 'Custom Shaper White-Label', price: 'Contact for scope', desc: 'Embeddable foil configurator for e-foil and yacht brands, with export handled on your own host.', cta: 'Book Shaper Demo' }
             ].map((tier) => (
               <div key={tier.name} style={{ background: '#081A2C', border: '1px solid #16324F', borderRadius: '10px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
                 <div>

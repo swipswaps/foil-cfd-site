@@ -13,6 +13,51 @@ const BENIGN = new RegExp([
   /WebGL/i,
 ].map(r => r.source).join('|'));
 
+function makeVtp(pointData: string): string {
+  return `<?xml version="1.0"?>
+<VTKFile type="PolyData" version="0.1" byte_order="LittleEndian">
+  <PolyData>
+    <Piece NumberOfPoints="6" NumberOfVerts="0" NumberOfLines="0" NumberOfStrips="0" NumberOfPolys="4">
+      <PointData Scalars="p">
+        ${pointData}
+      </PointData>
+      <Points>
+        <DataArray type="Float32" NumberOfComponents="3" format="ascii">0 0.1 0  0.5 0.1 0  1 0.1 0  0 -0.1 0  0.5 -0.1 0  1 -0.1 0</DataArray>
+      </Points>
+      <Polys>
+        <DataArray type="Int64" Name="connectivity" format="ascii">0 1 4 0 4 3 1 2 5 1 5 4</DataArray>
+        <DataArray type="Int64" Name="offsets" format="ascii">3 6 9 12</DataArray>
+      </Polys>
+    </Piece>
+  </PolyData>
+</VTKFile>`;
+}
+
+const VTP_PUT = `<DataArray type="Float32" Name="p" format="ascii">-0.5 -0.4 -0.2 0.1 0.2 0.3</DataArray>
+<DataArray type="Float32" Name="U" NumberOfComponents="3" format="ascii">1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0</DataArray>
+<DataArray type="Float32" Name="T" format="ascii">300 301 302 303 304 305</DataArray>`;
+
+const VTP_PUK = `<DataArray type="Float32" Name="p" format="ascii">-0.5 -0.4 -0.2 0.1 0.2 0.3</DataArray>
+<DataArray type="Float32" Name="U" NumberOfComponents="3" format="ascii">1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0</DataArray>
+<DataArray type="Float32" Name="k" format="ascii">0.1 0.12 0.14 0.16 0.18 0.2</DataArray>
+<DataArray type="Float32" Name="epsilon" format="ascii">0.01 0.02 0.03 0.04 0.05 0.06</DataArray>
+<DataArray type="Float32" Name="nut" format="ascii">0.001 0.002 0.003 0.004 0.005 0.006</DataArray>`;
+
+async function mockOnlineHealth(page: import('@playwright/test').Page) {
+  await page.route('**/api/health', async (route) => {
+    const pageOrigin = new URL(page.url()).origin;
+    if (new URL(route.request().url()).origin === pageOrigin) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'online', solver_available: true, blockMesh_available: true }),
+      });
+      return;
+    }
+    await route.abort('failed');
+  });
+}
+
 const roundBox = (box: { x: number; y: number; width: number; height: number }) => ({
   x: Math.max(0, Math.round(box.x)),
   y: Math.max(0, Math.round(box.y)),
@@ -106,7 +151,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     const t0 = Date.now();
     await page.goto(HOME, { waitUntil: 'load' });
     await page.waitForFunction(
-      () => /Static mode|Backend offline/i.test(document.body.innerText),
+      () => /Static demo|Static mode|Backend offline/i.test(document.body.innerText),
       null,
       { timeout: 20000 },
     );
@@ -115,7 +160,7 @@ test.describe('3D lab UX (static, no backend)', () => {
     expect(Date.now() - t0).toBeLessThan(25000);
     await expect(page.locator('.cfd-vtk-head')).toContainText(/\d+ pts · \d+ cells/);
     await expect(page.locator('#cfd').getByText(/Sample wing/i).first()).toBeVisible();
-    expect(await page.getByRole('button', { name: /Generate synthetic preview|Run simpleFoam/i }).count()).toBe(0);
+    expect(await page.getByRole('button', { name: /Run live solve|Preview field|Generate synthetic preview|Run simpleFoam/i }).count()).toBe(0);
 
     const canvasBox = await canvas.boundingBox();
     const chartBox = await page.locator('.cfd-chart').first().boundingBox();
@@ -367,5 +412,195 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(lab.getByText(/foil-model-test\.stl/).first()).toBeVisible({ timeout: 15000 });
     await expect(lab.locator('.cfd-vtk-head')).toContainText(/\d+ pts/, { timeout: 20000 });
     await expect(lab.locator('.cfd-chart-note')).toBeVisible();
+  });
+
+  test('primary status and solve controls avoid operator jargon', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    const badge = page.locator('.backend-badge').first();
+    await expect(badge).toBeVisible({ timeout: 20000 });
+    await expect(badge.locator('.solver-label')).not.toContainText(/docker compose|127\.0\.0\.1|OpenFOAM/i);
+
+    await page.getByRole('button', { name: /open sidebar/i }).first().click();
+    const tools = page.locator('.sidebar-section').filter({ hasText: 'Scientific tools' }).first();
+    await expect(tools.locator('.sidebar-section-label')).not.toContainText(/docker compose|127\.0\.0\.1|OpenFOAM/i);
+    await expect(tools.getByRole('button', { name: /Connect local backend/i })).toBeVisible();
+
+    // The operator command survives, but only inside a secondary disclosure.
+    const selfHost = tools.locator('.self-host').first();
+    await expect(selfHost).toContainText(/Self-host the solver/i);
+    await selfHost.locator('summary').click();
+    await expect(selfHost).toContainText(/docker compose/i);
+  });
+
+  test('closed sidebar is inert; Escape closes and restores focus', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    const aside = page.locator('.app-sidebar').first();
+    const inertWhenClosed = await aside.evaluate(
+      (el) => (el as HTMLElement).inert === true || el.hasAttribute('inert'),
+    );
+    expect(inertWhenClosed).toBe(true);
+
+    await page.getByRole('button', { name: /open sidebar/i }).first().click();
+    await expect(aside).toHaveClass(/open/);
+    expect(await aside.evaluate((el) => (el as HTMLElement).inert)).toBe(false);
+    expect(await page.evaluate(() => document.body.classList.contains('sidebar-locked'))).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(aside).not.toHaveClass(/open/);
+    await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('nav-burger');
+    expect(await page.evaluate(() => document.body.classList.contains('sidebar-locked'))).toBe(false);
+  });
+
+  test('probe station and chart summary give a keyboard and text path', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    await waitForLab(page);
+
+    await expect(page.locator('.cfd-chart-summary').first()).toContainText(/Peak suction Cp/);
+
+    const station = page.locator('.cfd-station input[type="range"]').first();
+    await station.scrollIntoViewIfNeeded();
+    await station.focus();
+    for (let i = 0; i < 5; i += 1) await page.keyboard.press('ArrowRight');
+
+    const table = page.locator('.cfd-probe-table').first();
+    await expect(table).toContainText(/\d+\.\d+/);
+    await expect(table.locator('td').first()).not.toHaveText('—');
+  });
+
+  test('first-run coach mark appears and dismissal persists', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    await openLab(page);
+    const coach = page.locator('.cfd-coach').first();
+    await expect(coach).toBeVisible({ timeout: 15000 });
+    await coach.getByRole('button', { name: 'Got it' }).click();
+    await expect(coach).toHaveCount(0);
+
+    await page.reload({ waitUntil: 'load' });
+    await openLab(page);
+    await expect(page.locator('.cfd-coach')).toHaveCount(0);
+  });
+
+  test('a mocked solve failure surfaces a reason and a retry', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route('**/api/health', async (route) => {
+      const pageOrigin = new URL(page.url()).origin;
+      if (new URL(route.request().url()).origin === pageOrigin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'online', solver_available: true, blockMesh_available: true }),
+        });
+        return;
+      }
+      await route.abort('failed');
+    });
+    await page.route('**/api/solve', async (route) => {
+      const pageOrigin = new URL(page.url()).origin;
+      if (new URL(route.request().url()).origin !== pageOrigin) {
+        await route.abort('failed');
+        return;
+      }
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'boom' }),
+      });
+    });
+
+    await page.goto(HOME, { waitUntil: 'load' });
+    await expect(page.locator('.backend-badge')).toContainText(/Live solver ready/i, { timeout: 30000 });
+
+    await page.getByRole('button', { name: /open sidebar/i }).first().click();
+    const solve = page.getByRole('button', { name: 'Run live solve' }).first();
+    await expect(solve).toBeVisible({ timeout: 10000 });
+    await solve.click();
+
+    await expect(page.locator('.upload-error')).toContainText(/HTTP 500|Could not start/i, { timeout: 15000 });
+    await expect(page.getByRole('button', { name: 'Run again' })).toBeVisible();
+  });
+
+  test('phone controls meet a 44-pixel tap target', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    const burger = page.locator('.nav-burger').first();
+    await expect(burger).toBeVisible();
+    const b = (await burger.boundingBox())!;
+    expect(b.width).toBeGreaterThanOrEqual(44);
+    expect(b.height).toBeGreaterThanOrEqual(44);
+
+    const tab = page.getByRole('tab', { name: 'Overview' });
+    const t = (await tab.boundingBox())!;
+    expect(t.height).toBeGreaterThanOrEqual(44);
+
+    await burger.click();
+    const close = page.locator('.sidebar-close').first();
+    const c = (await close.boundingBox())!;
+    expect(c.width).toBeGreaterThanOrEqual(44);
+    expect(c.height).toBeGreaterThanOrEqual(44);
+  });
+
+  test('field menu is detected from the dataset (adds k/epsilon/nut, drops T)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockOnlineHealth(page);
+    await page.route('**/api/jobs/default/surface.vtp', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/octet-stream', body: makeVtp(VTP_PUK) });
+    });
+
+    await page.goto(HOME, { waitUntil: 'load' });
+    await expect(page.locator('.backend-badge')).toContainText(/Live solver ready/i, { timeout: 30000 });
+    await openLab(page);
+
+    const select = page.locator('.cfd-lab-field select').first();
+    await expect(select.locator('option[value="k"]')).toHaveCount(1, { timeout: 20000 });
+    await expect(select.locator('option[value="epsilon"]')).toHaveCount(1);
+    await expect(select.locator('option[value="nut"]')).toHaveCount(1);
+    await expect(select.locator('option[value="T"]')).toHaveCount(0);
+
+    await select.selectOption('k');
+    await expect(page.locator('.cfd-vtk-head')).toContainText(/field=k/, { timeout: 20000 });
+    await expect(page.locator('.cfd-vtk-legend')).toBeVisible();
+  });
+
+  test('a completed solve drives the Cp chart and Cn from the surface', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockOnlineHealth(page);
+    await page.route('**/api/jobs/default/surface.vtp', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/octet-stream', body: makeVtp(VTP_PUT) });
+    });
+    await page.route('**/api/solve', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ job_id: 'testjob', status: 'queued' }),
+      });
+    });
+    await page.route('**/api/jobs/testjob/surface.vtp', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/octet-stream', body: makeVtp(VTP_PUK) });
+    });
+    await page.route('**/api/jobs/testjob', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ job_id: 'testjob', status: 'completed' }),
+      });
+    });
+
+    await page.goto(HOME, { waitUntil: 'load' });
+    await expect(page.locator('.backend-badge')).toContainText(/Live solver ready/i, { timeout: 30000 });
+    await openLab(page);
+    await page.getByRole('button', { name: /open sidebar/i }).first().click();
+    await page.getByRole('button', { name: 'Run live solve' }).click();
+    await page.keyboard.press('Escape');
+
+    const select = page.locator('.cfd-lab-field select').first();
+    await expect(select.locator('option[value="k"]')).toHaveCount(1, { timeout: 30000 });
+    await expect(select.locator('option[value="T"]')).toHaveCount(0);
+    await expect(page.locator('.cfd-chart-source')).toContainText(/Solved surface pressure/i);
+    await expect(page.locator('.cfd-lab-freestream')).toContainText(/Cn\s*-?\d/);
   });
 });

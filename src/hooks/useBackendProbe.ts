@@ -25,9 +25,9 @@ const CONSENT_TIMEOUT_MS = 30_000;
 const SAME_ORIGIN_TIMEOUT_MS = 10_000;
 
 const PERMISSION_DENIED =
-  'local network permission blocked — allow this site in browser settings';
+  'Local network access is blocked — allow this site in your browser settings';
 const PUBLIC_OFFLINE =
-  'local backend offline — run: docker compose up -d, then Connect';
+  'No local solver detected — showing the static sample';
 
 type LoopbackPermission = PermissionState | 'unknown';
 type HostClass = 'loopback' | 'private' | 'public';
@@ -127,7 +127,7 @@ async function probeUrl(base: string, timeoutMs: number): Promise<ProbeResult> {
 function offlineReason(needsConsent: boolean, blocked: boolean): string {
   if (blocked) return PERMISSION_DENIED;
   if (needsConsent) return PUBLIC_OFFLINE;
-  return 'backend unreachable — run: docker compose up -d';
+  return 'No local solver reachable — showing the static sample';
 }
 
 function actionLabelFor(needsConsent: boolean): string {

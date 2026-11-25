@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
   try {
@@ -20,19 +20,25 @@ import vtkPolyData from '@kitware/vtk.js/Common/DataModel/PolyData';
 import vtkColorTransferFunction from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction';
 import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
 import vtkPointPicker from '@kitware/vtk.js/Rendering/Core/PointPicker';
-import { fmtProbe, type FreeStream, type ProbeSample } from '../lib/probe';
+import { fmtProbe, type FreeStream, type ProbeReading, type ProbeSample } from '../lib/probe';
 import { backendFetch } from '../lib/backendFetch';
+import { labelForField, orderFields, type FieldInfo } from '../lib/fields';
+import { deriveCpFromSurface, type DerivedCp } from '../lib/cp';
 
 interface Props {
   datasetUrl: string;
-  field: 'p' | 'U' | 'T';
+  field: string;
   rotationX: number;
   rotationY: number;
   rotationZ: number;
   onProbe?: (sample: ProbeSample | null) => void;
+  onLoadState?: (state: 'loading' | 'ready' | 'error') => void;
+  onFieldsChange?: (fields: FieldInfo[]) => void;
+  onCpSample?: (cp: DerivedCp | null) => void;
   freeStream?: FreeStream;
   sectionCn?: number;
   focusRequest?: { sample: ProbeSample; nonce: number } | null;
+  probeStation?: { xc: number; nonce: number } | null;
 }
 
 interface VtkRefs {
@@ -47,8 +53,17 @@ interface VtkRefs {
   added?: boolean;
 }
 
+interface VtkArrayLike {
+  getName(): string;
+  getNumberOfComponents?(): number;
+  getRange?(): number[];
+  getComponent(tuple: number, component: number): number;
+}
+
 interface VtkPointDataLike {
-  getArrayByName(name: string): { getComponent(tuple: number, component: number): number } | null;
+  getArrayByName(name: string): VtkArrayLike | null;
+  getArrays(): VtkArrayLike[];
+  addArray(array: unknown): void;
 }
 
 interface VtkDataLike {
@@ -115,13 +130,17 @@ function fitOrtho(renderer: RendererLike, mode: 'top' | 'side') {
   renderer.resetCameraClippingRange();
 }
 
-export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ, onProbe, freeStream, sectionCn, focusRequest }: Props) {
+export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotationZ, onProbe, onLoadState, onFieldsChange, onCpSample, freeStream, sectionCn, focusRequest, probeStation }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vtkRef = useRef<VtkRefs | null>(null);
   const initFailedRef = useRef(false);
   const dataRef = useRef<VtkDataLike | null>(null);
   const datasetRef = useRef<string | null>(null);
   const probeWorldRef = useRef<ProbeSample | null>(null);
+  const fieldsRef = useRef<FieldInfo[]>([]);
+  const onLoadStateRef = useRef(onLoadState);
+  const onFieldsChangeRef = useRef(onFieldsChange);
+  const onCpSampleRef = useRef(onCpSample);
   const [status, setStatus] = useState('Waiting for layout…');
   const [legend, setLegend] = useState<{ name: string; lo: number; hi: number } | null>(null);
   const [probe, setProbe] = useState<Probe | null>(null);
@@ -271,6 +290,9 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
   // never closes over a stale rebuild function (it reads current rotation).
   useEffect(() => {
     rebuildVectorsRef.current = rebuildVectors;
+    onLoadStateRef.current = onLoadState;
+    onFieldsChangeRef.current = onFieldsChange;
+    onCpSampleRef.current = onCpSample;
   });
 
   const toggleVectors = () => {
@@ -356,6 +378,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
         setStatus('Ready — loading dataset…');
       } catch (err) {
         initFailedRef.current = true;
+        onLoadStateRef.current?.('error');
         setStatus(err instanceof Error ? `VTK init: ${err.message}` : 'VTK init failed');
       }
     };
@@ -395,6 +418,7 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       onProbe?.(null);
       const datasetChanged = datasetRef.current !== datasetUrl;
       datasetRef.current = datasetUrl;
+      if (datasetChanged) onLoadStateRef.current?.('loading');
       try {
         const res = await backendFetch(datasetUrl, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -404,26 +428,75 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
         const data = vtk.reader.getOutputData(0);
         if (!data) throw new Error('VTK dataset empty');
         const pd = data.getPointData();
-        const names = pd.getArrays().map((a: { getName: () => string }) => a.getName());
-        let colorName: string = field;
-        if (field === 'U' && pd.getArrayByName('U')) {
-          const vec = pd.getArrayByName('U');
-          const n = data.getNumberOfPoints();
-          const mag = new Float32Array(n);
-          for (let i = 0; i < n; i++) {
-            const u = vec.getComponent(i, 0) || 0;
-            const v = vec.getComponent(i, 1) || 0;
-            const w = vec.getComponent(i, 2) || 0;
-            mag[i] = Math.hypot(u, v, w);
+        const arrays = pd.getArrays().filter((a: VtkArrayLike) => !/(^Umag$|_mag$)/.test(a.getName()));
+        const available: FieldInfo[] = orderFields(
+          arrays.map((a: VtkArrayLike) => {
+            const comps = typeof a.getNumberOfComponents === 'function' ? a.getNumberOfComponents() : 1;
+            const name = a.getName();
+            return {
+              name,
+              label: labelForField(name),
+              kind: (comps > 1 ? 'vector' : 'scalar') as 'vector' | 'scalar',
+            };
+          }),
+        );
+        fieldsRef.current = available;
+        if (datasetChanged) {
+          onFieldsChangeRef.current?.(available);
+          // Derive a Cp distribution from the loaded surface so a completed job
+          // drives the chart instead of the synthetic preview curve.
+          const pArr = pd.getArrayByName('p');
+          if (pArr) {
+            const uArr = pd.getArrayByName('U');
+            const n = data.getNumberOfPoints();
+            const pressure = new Float32Array(n);
+            let uRef = 0;
+            for (let i = 0; i < n; i += 1) {
+              pressure[i] = pArr.getComponent(i, 0) || 0;
+              if (uArr) {
+                const m = Math.hypot(
+                  uArr.getComponent(i, 0) || 0,
+                  uArr.getComponent(i, 1) || 0,
+                  uArr.getComponent(i, 2) || 0,
+                );
+                if (m > uRef) uRef = m;
+              }
+            }
+            onCpSampleRef.current?.(
+              deriveCpFromSurface(data.getPoints().getData(), pressure, { uRef }),
+            );
+          } else {
+            onCpSampleRef.current?.(null);
           }
-          if (!pd.getArrayByName('Umag')) {
-            pd.addArray(vtkDataArray.newInstance({ name: 'Umag', values: mag, numberOfComponents: 1 }));
-          }
-          colorName = 'Umag';
         }
-        if (names.includes(field) || colorName !== field) {
-          const arr = pd.getArrayByName(colorName);
-          const range = arr?.getRange?.() ?? [0, 1];
+
+        const selected = pd.getArrayByName(field);
+        let colorName: string | null = selected ? field : null;
+        if (selected) {
+          const comps = typeof selected.getNumberOfComponents === 'function'
+            ? selected.getNumberOfComponents()
+            : 1;
+          if (comps > 1) {
+            const magName = field === 'U' ? 'Umag' : `${field}_mag`;
+            if (!pd.getArrayByName(magName)) {
+              const n = data.getNumberOfPoints();
+              const mag = new Float32Array(n);
+              for (let i = 0; i < n; i += 1) {
+                let sum = 0;
+                for (let c = 0; c < comps; c += 1) {
+                  const v = selected.getComponent(i, c) || 0;
+                  sum += v * v;
+                }
+                mag[i] = Math.sqrt(sum);
+              }
+              pd.addArray(vtkDataArray.newInstance({ name: magName, values: mag, numberOfComponents: 1 }));
+            }
+            colorName = magName;
+          }
+        }
+        const colorArr = colorName ? pd.getArrayByName(colorName) : null;
+        if (colorName && colorArr) {
+          const range = colorArr.getRange?.() ?? [0, 1];
           const lo = Number.isFinite(range[0]) ? range[0] : 0;
           const hi = Number.isFinite(range[1]) && range[1] > lo ? range[1] : lo + 1;
           vtk.ctf.setMappingRange(lo, hi);
@@ -431,13 +504,12 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
           vtk.mapper.setScalarVisibility(true);
           vtk.mapper.setColorByArrayName(colorName);
           vtk.mapper.setScalarModeToUsePointFieldData();
-          dataRef.current = data as unknown as VtkDataLike;
           setLegend({ name: colorName, lo, hi });
         } else {
           vtk.mapper.setScalarVisibility(false);
-          dataRef.current = data as unknown as VtkDataLike;
           setLegend(null);
         }
+        dataRef.current = data as unknown as VtkDataLike;
         if (!vtk.added) {
           vtk.view.getRenderer().addActor(vtk.actor);
           vtk.added = true;
@@ -446,8 +518,12 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
         if (datasetChanged) fitIso(vtk.view.getRenderer() as unknown as RendererLike);
         vtk.view.getRenderWindow().render();
         setStatus(`${data.getNumberOfPoints()} pts · ${data.getNumberOfCells()} cells · field=${field}`);
+        onLoadStateRef.current?.('ready');
       } catch (err) {
-        if (!cancelled) setStatus(err instanceof Error ? err.message : 'Load failed');
+        if (!cancelled) {
+          onLoadStateRef.current?.('error');
+          setStatus(err instanceof Error ? err.message : 'Load failed');
+        }
       }
     };
     load();
@@ -552,6 +628,91 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
     URL.revokeObjectURL(url);
   };
 
+  const samplePoint = (id: number): ProbeSample | null => {
+    const data = dataRef.current;
+    if (!data) return null;
+    const pd = data.getPointData();
+    const pts = data.getPoints().getData();
+    const comp = (name: string, tuple: number, component: number) => {
+      const arr = pd.getArrayByName(name);
+      return arr ? arr.getComponent(tuple, component) : Number.NaN;
+    };
+    const ux = comp('U', id, 0);
+    const uy = comp('U', id, 1);
+    const uz = comp('U', id, 2);
+    const readings: ProbeReading[] = [];
+    for (const f of fieldsRef.current) {
+      const arr = pd.getArrayByName(f.name);
+      if (!arr) continue;
+      if (f.kind === 'vector') {
+        const comps = typeof arr.getNumberOfComponents === 'function' ? arr.getNumberOfComponents() : 3;
+        let sum = 0;
+        for (let c = 0; c < comps; c += 1) {
+          const v = arr.getComponent(id, c) || 0;
+          sum += v * v;
+        }
+        readings.push({ name: f.name, label: f.label, value: Math.sqrt(sum) });
+      } else {
+        readings.push({ name: f.name, label: f.label, value: arr.getComponent(id, 0) });
+      }
+    }
+    return {
+      x: Number(pts[id * 3]) || 0,
+      y: Number(pts[id * 3 + 1]) || 0,
+      z: Number(pts[id * 3 + 2]) || 0,
+      p: comp('p', id, 0),
+      u: Number.isFinite(ux) || Number.isFinite(uy) || Number.isFinite(uz)
+        ? Math.hypot(ux || 0, uy || 0, uz || 0)
+        : Number.NaN,
+      t: comp('T', id, 0),
+      readings,
+    };
+  };
+
+  // Keyboard/slider probe: pick the point nearest a requested chord station.
+  const sampleNearestX = (xc: number) => {
+    const data = dataRef.current;
+    if (!data) return;
+    const pts = data.getPoints().getData();
+    const n = data.getNumberOfPoints();
+    if (!n) return;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const x = Number(pts[i * 3]);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    }
+    const target = minX + Math.min(1, Math.max(0, xc)) * ((maxX - minX) || 1);
+    let best = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < n; i++) {
+      const d = Math.abs(Number(pts[i * 3]) - target);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    const sample = best >= 0 ? samplePoint(best) : null;
+    if (!sample) return;
+    probeWorldRef.current = sample;
+    setProbe({ ...sample, left: 0, top: 0 });
+    projectProbe();
+    onProbe?.(sample);
+    setAnnouncement(
+      `Station x/c ${xc.toFixed(2)} · p ${fmtProbe(sample.p)} · |U| ${fmtProbe(sample.u)} · T ${fmtProbe(sample.t)}`,
+    );
+  };
+
+  const sampleNearestXRef = useRef(sampleNearestX);
+  useEffect(() => {
+    sampleNearestXRef.current = sampleNearestX;
+  });
+  useEffect(() => {
+    if (!probeStation) return;
+    sampleNearestXRef.current(probeStation.xc);
+  }, [probeStation]);
+
   const pickAt = (clientX: number, clientY: number) => {
     const vtk = vtkRef.current;
     const data = dataRef.current;
@@ -571,25 +732,8 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
       onProbe?.(null);
       return;
     }
-    const pd = data.getPointData();
-    const pts = data.getPoints().getData();
-    const comp = (name: string, tuple: number, component: number) => {
-      const arr = pd.getArrayByName(name);
-      return arr ? arr.getComponent(tuple, component) : Number.NaN;
-    };
-    const ux = comp('U', id, 0);
-    const uy = comp('U', id, 1);
-    const uz = comp('U', id, 2);
-    const sample: ProbeSample = {
-      x: Number(pts[id * 3]) || 0,
-      y: Number(pts[id * 3 + 1]) || 0,
-      z: Number(pts[id * 3 + 2]) || 0,
-      p: comp('p', id, 0),
-      u: Number.isFinite(ux) || Number.isFinite(uy) || Number.isFinite(uz)
-        ? Math.hypot(ux || 0, uy || 0, uz || 0)
-        : Number.NaN,
-      t: comp('T', id, 0),
-    };
+    const sample = samplePoint(id);
+    if (!sample) return;
     probeWorldRef.current = sample;
     setProbe({ ...sample, left: clientX - rect.left, top: clientY - rect.top });
     onProbe?.(sample);
@@ -709,9 +853,18 @@ export function CfdVtkViewer({ datasetUrl, field, rotationX, rotationY, rotation
                 <button type="button" className="cfd-probe-close" onClick={() => { setProbe(null); probeWorldRef.current = null; onProbe?.(null); }} aria-label="Clear probe">×</button>
               </div>
               <dl>
-                <dt>p</dt><dd>{fmtProbe(probe.p)}</dd>
-                <dt>U</dt><dd>{fmtProbe(probe.u)}</dd>
-                <dt>T</dt><dd>{fmtProbe(probe.t)}</dd>
+                {(probe.readings && probe.readings.length > 0
+                  ? probe.readings
+                  : [
+                      { name: 'p', label: 'p', value: probe.p },
+                      { name: 'U', label: 'U', value: probe.u },
+                      { name: 'T', label: 'T', value: probe.t },
+                    ]
+                ).map((r) => (
+                  <Fragment key={r.name}>
+                    <dt>{r.name}</dt><dd>{fmtProbe(r.value)}</dd>
+                  </Fragment>
+                ))}
               </dl>
               <p className="cfd-probe-coords">
                 ({fmtProbe(probe.x)}, {fmtProbe(probe.y)}, {fmtProbe(probe.z)})

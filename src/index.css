@@ -1520,3 +1520,256 @@ html[data-sidebar='closed'] .app-sidebar:not(.open) {
 }
 .cfd-sidebar-probe-btn:hover { border-color: #38BDF8; }
 .cfd-sidebar-probe-btn:focus-visible { outline: 2px solid #38BDF8; outline-offset: 2px; }
+
+/* =========================================================================
+   SOLVER STATUS (one vocabulary: badge, lab, hydro)
+   ========================================================================= */
+.solver-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: #94AEBF;
+}
+.solver-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.solver-dot-online { background: #10B981; }
+.solver-dot-probing { background: #38BDF8; animation: pulse 1.4s infinite; }
+.solver-dot-offline { background: #F59E0B; }
+.solver-status-lab { color: #7FB6D4; }
+.solver-status-node { color: inherit; }
+.solver-label { white-space: nowrap; }
+
+.backend-badge-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+.backend-details {
+  font-size: 0.62rem;
+  color: #7FB6D4;
+  max-width: 340px;
+}
+.backend-details summary {
+  cursor: pointer;
+  color: #5E8FA8;
+  text-align: right;
+  list-style: none;
+}
+.backend-details summary::-webkit-details-marker { display: none; }
+.backend-details summary:hover { color: #A6D9F0; }
+.backend-details dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.1rem 0.6rem;
+  margin: 0.25rem 0 0;
+}
+.backend-details dt { color: #5E8FA8; }
+.backend-details dd { margin: 0; }
+.backend-reason { margin: 0.25rem 0 0; line-height: 1.4; }
+
+/* Secondary self-host disclosure inside the sidebar */
+.self-host {
+  margin-top: 0.4rem;
+  font-size: 0.66rem;
+  color: #7FB6D4;
+}
+.self-host summary { cursor: pointer; color: #5BC0EB; }
+.self-host p { margin: 0.35rem 0 0; line-height: 1.45; }
+.self-host code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.66rem;
+  color: #BAE6FD;
+}
+
+/* Body scroll lock while the drawer is open */
+body.sidebar-locked { overflow: hidden; }
+
+/* Solve action: note + three-step progress */
+.solve-note {
+  margin: 0;
+  font-size: 0.62rem;
+  color: #5E8FA8;
+  line-height: 1.4;
+}
+.cfd-solve-status { display: flex; flex-direction: column; gap: 0.3rem; }
+.cfd-steps {
+  display: flex;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: step;
+}
+.cfd-steps li {
+  flex: 1;
+  font-size: 0.56rem;
+  text-align: center;
+  padding: 0.2rem 0.1rem;
+  border-radius: 4px;
+  color: #5E8FA8;
+  border: 1px solid #1E3A4A;
+  background: #06121A;
+}
+.cfd-steps li.done { color: #A6D9F0; border-color: #2B6E8C; }
+.cfd-steps li.active { color: #04101D; background: #38BDF8; border-color: #38BDF8; font-weight: 700; }
+
+/* Chart text equivalent */
+.cfd-chart-cell { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.cfd-chart-summary {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: #94C3DF;
+  background: rgba(56, 189, 248, 0.06);
+  border-left: 2px solid #2B6E8C;
+  border-radius: 0 4px 4px 0;
+  padding: 0.35rem 0.55rem;
+}
+.cfd-chart-summary-label {
+  display: block;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5E8FA8;
+}
+
+/* Keyboard probe station + table */
+.cfd-probe-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.25rem;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #16324F;
+  border-radius: 10px;
+  background: #081A2C;
+}
+.cfd-station {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  color: #93C5FD;
+}
+.cfd-station input[type="range"] { width: 160px; accent-color: #38BDF8; }
+.cfd-station-value {
+  font-variant-numeric: tabular-nums;
+  color: #BAE6FD;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.cfd-probe-table {
+  border-collapse: collapse;
+  font-size: 0.68rem;
+  color: #BAE6FD;
+}
+.cfd-probe-table caption {
+  caption-side: top;
+  text-align: left;
+  color: #5E8FA8;
+  font-size: 0.6rem;
+  padding-bottom: 0.2rem;
+}
+.cfd-probe-table th,
+.cfd-probe-table td {
+  padding: 0.15rem 0.6rem;
+  border-bottom: 1px solid #132C46;
+  text-align: left;
+}
+.cfd-probe-table th[scope="row"] { color: #7FB6D4; font-weight: 600; }
+.cfd-probe-table td { font-variant-numeric: tabular-nums; }
+
+/* Loading line for the 3D viewer */
+.cfd-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.68rem;
+  color: #7FB6D4;
+}
+.cfd-loading-bar {
+  position: relative;
+  width: 84px;
+  height: 4px;
+  border-radius: 2px;
+  background: #132C46;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.cfd-loading-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: 2px;
+  background: #38BDF8;
+  animation: cfd-loading-slide 1.2s ease-in-out infinite;
+}
+@keyframes cfd-loading-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260%); }
+}
+
+/* First-run coach mark */
+.cfd-coach {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #1E4976;
+  border-radius: 10px;
+  background: rgba(15, 41, 66, 0.85);
+  color: #CBD5E1;
+  font-size: 0.72rem;
+}
+.cfd-coach-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: #BAE6FD;
+}
+.cfd-coach-close {
+  background: transparent;
+  border: none;
+  color: #94AEBF;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+}
+.cfd-coach ol { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+.cfd-coach li { margin: 0.15rem 0; line-height: 1.45; }
+.cfd-coach-dismiss { margin-top: 0.5rem; }
+
+/* 44-pixel tap targets for primary mobile controls */
+@media (max-width: 600px) {
+  .nav-burger,
+  .sidebar-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .hero-tab,
+  .upload-btn,
+  .backend-retry,
+  .cfd-vtk-actions button,
+  .cfd-station input[type="range"] {
+    min-height: 44px;
+  }
+  .device-pick button { min-height: 44px; }
+  .cfd-vtk-actions button { padding: 0.4rem 0.7rem; }
+}
+
+/* Chart provenance line (solver vs synthetic) */
+.cfd-chart-source {
+  margin: 0;
+  font-size: 0.6rem;
+  line-height: 1.4;
+  color: #5E8FA8;
+  font-style: italic;
+}

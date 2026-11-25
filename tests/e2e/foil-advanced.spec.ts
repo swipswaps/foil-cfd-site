@@ -78,8 +78,8 @@ test.describe('advanced: home + sidebar', () => {
   test('CFD Laboratory renders the Plotly Cp chart when backend is online', async ({ page }) => {
     const errs = await captureErrors(page);
     await page.goto(HOME, { waitUntil: 'load' });
-    await page.waitForFunction(() => /Backend online|Backend offline|Static mode/.test(document.body.innerText), null, { timeout: 15000 });
-    if (!(await page.getByText(/Backend online/).count())) {
+    await page.waitForFunction(() => /Live solver|Backend online|Static demo|Backend offline|Static mode/.test(document.body.innerText), null, { timeout: 15000 });
+    if (!(await page.getByText(/Live solver|Backend online/).count())) {
       test.skip(true, 'backend not online; chart is gated on backendOnline && datasetUrl');
     }
     await openLab(page);
@@ -94,13 +94,13 @@ test.describe('advanced: home + sidebar', () => {
 
   test('synthetic solve creates a job and keeps the lab rendered', async ({ page }) => {
     await page.goto(HOME, { waitUntil: 'load' });
-    await page.waitForFunction(() => /Backend online|Backend offline|Static mode/.test(document.body.innerText), null, { timeout: 15000 });
-    if (!(await page.getByText(/Backend online/).count())) {
+    await page.waitForFunction(() => /Live solver|Backend online|Static demo|Backend offline|Static mode/.test(document.body.innerText), null, { timeout: 15000 });
+    if (!(await page.getByText(/Live solver|Backend online/).count())) {
       test.skip(true, 'backend not online');
     }
     await openLab(page);
     await openSidebar(page);
-    const solve = page.getByRole('button', { name: /Generate synthetic preview|Run simpleFoam/i }).first();
+    const solve = page.getByRole('button', { name: /Run live solve|Preview field|Generate synthetic preview|Run simpleFoam/i }).first();
     await expect(solve).toBeVisible({ timeout: 10_000 });
     await solve.click();
     await expect(page.locator('.cfd-job-status')).toContainText(/completed|failed/i, { timeout: 45_000 });

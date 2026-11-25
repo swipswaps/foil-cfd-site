@@ -100,17 +100,17 @@ test.describe('CFD lab components', () => {
     test.setTimeout(150_000);
     await page.goto(HOME, { waitUntil: 'load' });
     await page.waitForFunction(
-      () => /Backend online|Backend offline|Static mode|Backend unavail/i.test(document.body.innerText),
+      () => /Live solver|Backend online|Static demo|Static mode|Backend offline|Backend unavail/i.test(document.body.innerText),
       null, { timeout: 20_000 },
     );
-    const online = (await page.getByText(/Backend online/i).count()) > 0;
+    const online = (await page.getByText(/Live solver|Backend online/i).count()) > 0;
     if (!online) test.skip(true, 'backend offline: online solve needs a build with VITE_BACKEND_URL + a running backend');
     await openLab(page);
     // the solve control lives in the sidebar (onCfdSolve), so open it first
     const burger = page.locator('.nav-burger').first();
     if (await burger.count()) await burger.click();
     await expect(page.locator('.app-sidebar').first()).toHaveClass(/open/, { timeout: 5_000 });
-    const solve = page.getByRole('button', { name: /Generate synthetic preview|Run simpleFoam/i }).first();
+    const solve = page.getByRole('button', { name: /Run live solve|Preview field|Generate synthetic preview|Run simpleFoam/i }).first();
     await expect(solve).toBeVisible({ timeout: 15_000 });
     await solve.click();
     await expect(page.locator('.cfd-job-status')).toContainText(/completed|failed/i, { timeout: 90_000 });
@@ -157,7 +157,7 @@ test.describe('layout + retry regressions', () => {
   test('Retry flips offline -> online when a loopback backend answers', async ({ page }) => {
     await page.route(BE, r => r.abort('failed'));
     await page.goto(HOME, { waitUntil: 'load' });
-    await expect(page.locator('.backend-badge')).toContainText(/Static mode|offline|unavail/i, { timeout: 20_000 });
+    await expect(page.locator('.backend-badge')).toContainText(/Static demo|Static mode|offline|unavail/i, { timeout: 20_000 });
     await openLab(page);
     await page.unroute(BE);
     await page.route('**/api/health', r => r.fulfill({
@@ -166,7 +166,7 @@ test.describe('layout + retry regressions', () => {
       body: JSON.stringify({ status: 'online', backend: 'test', solver_available: true, blockMesh_available: true, vtk_data_available: true }),
     }));
     await page.locator('.backend-retry').first().click();
-    await expect(page.locator('.backend-badge')).toContainText(/Backend online/i, { timeout: 20_000 });
-    await expect(page.locator('.cfd-lab-status')).toContainText(/OpenFOAM ready/i, { timeout: 20_000 });
+    await expect(page.locator('.backend-badge')).toContainText(/Live solver|Backend online/i, { timeout: 20_000 });
+    await expect(page.locator('.cfd-lab-status')).toContainText(/Solver ready|OpenFOAM ready/i, { timeout: 20_000 });
   });
 });

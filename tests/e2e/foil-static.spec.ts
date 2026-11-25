@@ -22,7 +22,7 @@ test.describe('static demo (no backend)', () => {
 
     await page.goto(HOME, { waitUntil: 'load' });
     await page.waitForFunction(
-      () => /Static mode|Backend offline|Backend unavail/i.test(document.body.innerText),
+      () => /Static demo|Static mode|Backend offline|Backend unavail/i.test(document.body.innerText),
       null,
       { timeout: 15000 },
     );

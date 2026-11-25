@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { NavBar } from './components/NavBar';
 import { Sidebar } from './components/Sidebar';
 import { BackendBadge } from './components/BackendBadge';
@@ -13,9 +13,12 @@ import type { SceneContent } from './data/scene';
 import { buildSceneLab, type SceneLab } from './lib/sceneVtp';
 import type { ProbeSample } from './lib/probe';
 
-export type CfdField = 'p' | 'U' | 'T';
+export type CfdField = string;
 
 const STATIC_DEMO_DATASET = `${import.meta.env.BASE_URL}demo/surface.vtp`;
+const POLL_INTERVAL_MS = 1_500;
+const POLL_RETRY_INTERVAL_MS = 2_000;
+const POLL_MAX_ERRORS = 5;
 
 const loadCfdLab = () => import('./sections/CfdLab');
 
@@ -33,6 +36,35 @@ function detectDevice(): DetectedDevice {
   if (w < 640) return 'phone';
   if (isTouchDevice && w < 1100) return 'tablet';
   return 'desktop';
+}
+
+function jobStepLabel(status: string): string {
+  switch (status) {
+    case 'submitting':
+      return 'Submitting';
+    case 'queued':
+      return 'Meshing';
+    case 'running':
+      return 'Solving';
+    case 'completed':
+      return 'Post-processing';
+    case 'failed':
+      return 'Failed';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return '';
+  }
+}
+
+function initialField(): CfdField {
+  try {
+    const saved = window.localStorage.getItem('foil.field');
+    if (saved && saved.trim()) return saved;
+  } catch {
+    /* private mode */
+  }
+  return 'p';
 }
 
 function CfdLabSkeleton() {
@@ -67,11 +99,15 @@ export default function App() {
   const [rotationY, setRotationY] = useState(0);
   const [rotationZ, setRotationZ] = useState(0);
 
-  const [cfdField, setCfdField] = useState<CfdField>('p');
+  const [cfdField, setCfdField] = useState<CfdField>(initialField);
   const [cfdJobId, setCfdJobId] = useState<string | null>(null);
   const [cfdJobStatus, setCfdJobStatus] = useState<string>('idle');
   const [cfdError, setCfdError] = useState<string | null>(null);
   const [cfdJobDatasetUrl, setCfdJobDatasetUrl] = useState<string | null>(null);
+  const [cfdStartedAt, setCfdStartedAt] = useState<number | null>(null);
+  const [cfdElapsed, setCfdElapsed] = useState(0);
+  const [cfdConnectionLost, setCfdConnectionLost] = useState(false);
+  const [cfdPollNonce, setCfdPollNonce] = useState(0);
 
   const sceneLab = useMemo<SceneLab | null>(() => {
     try {
@@ -84,6 +120,27 @@ export default function App() {
     if (!sceneLab) return;
     return () => sceneLab.revoke();
   }, [sceneLab]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('foil.field', cfdField);
+    } catch {
+      /* private mode */
+    }
+  }, [cfdField]);
+
+  const closeSidebar = useCallback(() => {
+    setSidebarOpen(false);
+    requestAnimationFrame(() => document.getElementById('nav-burger')?.focus());
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeSidebar();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [closeSidebar]);
 
   useEffect(() => {
     const apply = () => {
@@ -135,42 +192,82 @@ export default function App() {
     document.documentElement.setAttribute('data-sidebar', sidebarOpen ? 'open' : 'closed');
   }, [effectiveDevice, sidebarOpen]);
 
+  // Lock body scroll while the drawer is open (mobile and overlay layouts).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSidebarOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    if (!sidebarOpen) return;
+    document.body.classList.add('sidebar-locked');
+    return () => document.body.classList.remove('sidebar-locked');
+  }, [sidebarOpen]);
 
-  // Poll active job
+  const cfdActive =
+    cfdJobStatus === 'submitting' || cfdJobStatus === 'queued' || cfdJobStatus === 'running';
+
+  // Elapsed seconds tick while a solve is active.
+  useEffect(() => {
+    if (cfdStartedAt == null || !cfdActive) return;
+    const tick = () => setCfdElapsed(Math.max(0, Math.floor((Date.now() - cfdStartedAt) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [cfdStartedAt, cfdActive]);
+
+  // Poll the active job with a bounded retry so a dropped connection is visible
+  // instead of silently stopping the update loop.
   useEffect(() => {
     if (!cfdJobId || !backend.backendOrigin) return;
+    if (!cfdActive) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let errors = 0;
+    const origin = backend.backendOrigin;
+
     const poll = async () => {
       try {
-        const res = await backendFetch(`${backend.backendOrigin}/api/jobs/${cfdJobId}`);
+        const res = await backendFetch(`${origin}/api/jobs/${cfdJobId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (cancelled) return;
+        errors = 0;
+        setCfdConnectionLost(false);
         setCfdJobStatus(data.status);
         if (data.status === 'completed') {
-          setCfdJobDatasetUrl(`${backend.backendOrigin}/api/jobs/${cfdJobId}/surface.vtp`);
-        } else if (data.status !== 'failed') {
-          setTimeout(poll, 1500);
+          setCfdJobDatasetUrl(`${origin}/api/jobs/${cfdJobId}/surface.vtp`);
+        } else if (data.status === 'failed') {
+          setCfdError(typeof data.error === 'string' && data.error ? data.error : 'The solver reported a failure.');
+        } else {
+          timer = setTimeout(poll, POLL_INTERVAL_MS);
         }
-      } catch (err) {
-        if (!cancelled) setCfdError(err instanceof Error ? err.message : 'Poll failed');
+      } catch {
+        if (cancelled) return;
+        errors += 1;
+        setCfdConnectionLost(true);
+        if (errors < POLL_MAX_ERRORS) {
+          timer = setTimeout(poll, POLL_RETRY_INTERVAL_MS);
+        } else {
+          setCfdError(
+            'Lost connection to the local solver. The job may still be running on the host; reconnect to check.',
+          );
+        }
       }
     };
+
     poll();
-    return () => { cancelled = true; };
-  }, [cfdJobId, backend.backendOrigin]);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [cfdJobId, backend.backendOrigin, cfdActive, cfdPollNonce]);
 
   const startCfdSolve = async () => {
     if (!backend.backendOrigin) return;
+    const started = Date.now();
     setCfdError(null);
+    setCfdConnectionLost(false);
+    setCfdJobDatasetUrl(null);
     setCfdJobStatus('submitting');
+    setCfdStartedAt(started);
+    setCfdElapsed(0);
+    setCfdJobId(null);
     try {
       const res = await backendFetch(`${backend.backendOrigin}/api/solve`, {
         method: 'POST',
@@ -182,9 +279,22 @@ export default function App() {
       setCfdJobId(data.job_id);
       setCfdJobStatus('queued');
     } catch (err) {
-      setCfdError(err instanceof Error ? err.message : 'Submit failed');
-      setCfdJobStatus('idle');
+      setCfdError(err instanceof Error ? err.message : 'Could not start the solve.');
+      setCfdJobStatus('failed');
+      setCfdElapsed(Math.floor((Date.now() - started) / 1000));
     }
+  };
+
+  const cancelCfdSolve = () => {
+    setCfdJobStatus('cancelled');
+    setCfdConnectionLost(false);
+    setCfdError(null);
+  };
+
+  const retryCfdPoll = () => {
+    setCfdConnectionLost(false);
+    setCfdError(null);
+    setCfdPollNonce((n) => n + 1);
   };
 
   const handleRotation = (axis: 'x' | 'y' | 'z', v: number) => {
@@ -212,7 +322,7 @@ export default function App() {
         />
         <Sidebar
           open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
+          onClose={closeSidebar}
           devicePick={devicePick}
           detectedDevice={detectedDevice}
           onDeviceChange={setDevicePick}
@@ -231,24 +341,33 @@ export default function App() {
           cadUrl={cad.url}
           onCadRetry={cad.probe}
           backendMode={backend.mode}
+          backendStatus={backend.status}
           backendUrl={backend.backendOrigin}
           solverAvailable={backend.solverAvailable}
           onBackendRetry={backend.probe}
           cfdJobId={cfdJobId}
           cfdJobStatus={cfdJobStatus}
+          cfdJobStep={jobStepLabel(cfdJobStatus)}
+          cfdElapsed={cfdElapsed}
+          cfdConnectionLost={cfdConnectionLost}
           cfdError={cfdError}
           onCfdSolve={startCfdSolve}
+          onCfdCancel={cancelCfdSolve}
+          onCfdRetry={startCfdSolve}
+          onCfdRetryPoll={retryCfdPoll}
           lastProbe={lastProbe}
           onFocusProbe={() => { if (lastProbe) setFocusRequest({ sample: lastProbe, nonce: Date.now() }); }}
         />
         {sidebarOpen && (
-          <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+          <div className="sidebar-backdrop" onClick={closeSidebar} aria-hidden="true" />
         )}
         <main className="app-main">
           <div className="backend-badge-wrapper">
             <BackendBadge
               status={backend.status}
               reason={backend.reason}
+              solverAvailable={backend.solverAvailable}
+              connected={backendOnline}
               actionLabel={backend.actionLabel}
               onRetry={backend.probe}
             />
@@ -272,12 +391,14 @@ export default function App() {
                   onFieldChange={setCfdField}
                   sceneLabel={labLabel}
                   cp={sceneLab?.cp}
+                  cpFromJob={Boolean(cfdJobDatasetUrl)}
                   chartNote={sceneLab?.kind === 'model' ? '3D model · field-colored surface (the Cp chart applies to airfoils)' : undefined}
                   datasetUrl={labDatasetUrl}
                   jobId={backendOnline ? cfdJobId : null}
                   jobStatus={backendOnline ? cfdJobStatus : 'static'}
                   speed={speed}
                   onProbe={setLastProbe}
+                  lastProbe={lastProbe}
                   focusRequest={focusRequest}
                   rotationX={rotationX}
                   rotationY={rotationY}

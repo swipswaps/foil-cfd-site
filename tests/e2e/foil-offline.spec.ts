@@ -5,7 +5,7 @@ const HOME = BASE + '/';
 
 // Any loopback / LAN backend origin the page might probe. Aborting all of them
 // makes "backend offline" deterministic regardless of how the build was made.
-const BACKEND = /\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0|192\.168\.\d{1,3}\.\d{1,3})(?::(?:8002|8090))?\//;
+const BACKEND = /\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0|192\.168\.\d{1,3}\.\d{1,3})(?::(?:8000|8002|8090))?\//;
 
 const BENIGN = new RegExp([
   /favicon/i, /manifest/i, /ResizeObserver/i,
@@ -43,8 +43,8 @@ test.describe('backend offline (static mode)', () => {
     await page.goto(HOME, { waitUntil: 'load' });
     // offline is stated explicitly, not a perpetual spinner
     await expect(
-      page.getByText(/Static mode|Backend offline|Backend unavail/i).first(),
-    ).toBeVisible({ timeout: 20_000 });
+      page.locator('.backend-badge').first(),
+    ).toContainText(/Static demo|Static mode|Backend offline|Backend unavail/i, { timeout: 20_000 });
 
     await openLab(page);
     await expect(page.getByRole('heading', { name: /CFD Laboratory/i }).first()).toBeVisible({ timeout: 20_000 });
@@ -66,7 +66,7 @@ test.describe('backend offline (static mode)', () => {
       await connect.click({ timeout: 5_000 }).catch(() => {});
       // never a blank page / navigation away; the app stays usable and offline
       expect(page.url().startsWith(BASE)).toBeTruthy();
-      await expect(page.locator('body')).toContainText(/CFD Laboratory|Static mode|Backend offline|Backend unavail/i, { timeout: 20_000 });
+      await expect(page.locator('body')).toContainText(/CFD Laboratory|Static demo|Static mode|Backend offline|Backend unavail/i, { timeout: 20_000 });
     } else {
       test.info().annotations.push({ type: 'note', description: 'no Connect control in this build' });
     }

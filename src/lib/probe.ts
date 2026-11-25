@@ -1,3 +1,9 @@
+export interface ProbeReading {
+  name: string;
+  label: string;
+  value: number;
+}
+
 export interface ProbeSample {
   x: number;
   y: number;
@@ -5,6 +11,7 @@ export interface ProbeSample {
   p: number;
   u: number;
   t: number;
+  readings?: ProbeReading[];
 }
 
 export function fmtProbe(value: number, digits = 2): string {

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { DevicePanel, type DevicePick, type DetectedDevice } from './DevicePanel';
 import { ModelUploader } from './ModelUploader';
 import type { SceneContent } from '../data/scene';
 import { fmtProbe, type ProbeSample } from '../lib/probe';
+import type { BackendStatus } from '../hooks/useBackendProbe';
 
 interface Props {
   open: boolean;
@@ -24,16 +26,25 @@ interface Props {
   cadUrl: string;
   onCadRetry: () => void;
   backendMode: 'static' | 'cfd';
+  backendStatus: BackendStatus;
   backendUrl: string;
   solverAvailable: boolean;
   onBackendRetry: () => void;
   cfdJobId: string | null;
   cfdJobStatus: string;
+  cfdJobStep: string;
+  cfdElapsed: number;
+  cfdConnectionLost: boolean;
   cfdError: string | null;
   onCfdSolve: () => void;
+  onCfdCancel: () => void;
+  onCfdRetry: () => void;
+  onCfdRetryPoll: () => void;
   lastProbe: ProbeSample | null;
   onFocusProbe: () => void;
 }
+
+const STEPS = ['Meshing', 'Solving', 'Post-processing'] as const;
 
 export function Sidebar({
   open, onClose,
@@ -44,16 +55,38 @@ export function Sidebar({
   rotationX, rotationY, rotationZ, onRotationChange, onRotationReset,
   cadStatus, cadUrl, onCadRetry,
   backendUrl, solverAvailable, onBackendRetry,
-  cfdJobId, cfdJobStatus, cfdError, onCfdSolve, lastProbe, onFocusProbe,
+  cfdJobId, cfdJobStatus, cfdJobStep, cfdElapsed, cfdConnectionLost, cfdError,
+  onCfdSolve, onCfdCancel, onCfdRetry, onCfdRetryPoll,
+  lastProbe, onFocusProbe,
 }: Props) {
-  const solving = cfdJobStatus === 'running' || cfdJobStatus === 'submitting';
-  const portLabel = backendUrl ? backendUrl.replace(/^https?:\/\//, '') : 'offline';
+  const [copied, setCopied] = useState(false);
+  const solving = cfdJobStatus === 'running' || cfdJobStatus === 'submitting' || cfdJobStatus === 'queued';
   // backendUrl is only set when the probe actually got a 200 from /api/health.
   // Use it as the single source of truth instead of backendMode, which can drift.
   const backendOnline = !!backendUrl;
+  const terminal = cfdJobStatus === 'completed' || cfdJobStatus === 'failed' || cfdJobStatus === 'cancelled';
+  const activeStep =
+    cfdJobStatus === 'submitting' || cfdJobStatus === 'queued'
+      ? 0
+      : cfdJobStatus === 'running'
+      ? 1
+      : cfdJobStatus === 'completed'
+      ? 2
+      : -1;
+
+  const copyJobId = async () => {
+    if (!cfdJobId) return;
+    try {
+      await navigator.clipboard.writeText(cfdJobId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   return (
-    <aside className={`app-sidebar ${open ? 'open' : ''}`} aria-hidden={!open}>
+    <aside id="app-sidebar" className={`app-sidebar ${open ? 'open' : ''}`} aria-hidden={!open} inert={!open}>
       <div className="sidebar-head">
         <span className="sidebar-brand">
           FOIL<span>.CFD</span>
@@ -110,7 +143,7 @@ export function Sidebar({
       <div className="sidebar-section">
         <div className="sidebar-section-label">
           Scientific tools
-          <span className="sidebar-section-hint">{portLabel}</span>
+          <span className="sidebar-section-hint">{backendOnline ? 'live' : 'static'}</span>
         </div>
 
         {backendOnline ? (
@@ -119,37 +152,88 @@ export function Sidebar({
               type="button"
               onClick={onCfdSolve}
               disabled={solving}
-              className="upload-btn upload-btn-full"
-              title={solverAvailable ? 'Run simpleFoam on the bundled 2D channel case' : 'Generate a synthetic NACA0012 preview; no CFD solver is run'}
+              className="upload-btn upload-btn-full solve-btn"
+              title={solverAvailable ? 'Run a live simpleFoam solve on the bundled 2D channel case' : 'Render a synthetic field preview; no CFD solver is run'}
             >
               {solving
-                ? (cfdJobStatus === 'submitting' ? 'Submitting…' : 'Solving…')
+                ? (cfdJobStatus === 'submitting' ? 'Submitting…' : `Solving… ${cfdElapsed}s`)
                 : solverAvailable
-                ? 'Run simpleFoam'
-                : 'Generate synthetic preview'}
+                ? 'Run live solve'
+                : 'Preview field'}
             </button>
+            <p className="solve-note">
+              {solverAvailable
+                ? 'Bundled 2D channel case · simpleFoam · about 30 seconds'
+                : 'Synthetic field preview · no CFD solver runs'}
+            </p>
 
             {cfdJobId && cfdJobStatus !== 'idle' && (
-              <div className="cfd-sidebar-status">
-                <span className={`cfd-status-dot cfd-status-${cfdJobStatus}`} />
-                Job {cfdJobId.slice(0, 8)} · {cfdJobStatus}
+              <div className="cfd-solve-status" aria-live="polite">
+                <ol className="cfd-steps">
+                  {STEPS.map((label, i) => (
+                    <li
+                      key={label}
+                      className={i === activeStep ? 'active' : i < activeStep ? 'done' : ''}
+                      aria-current={i === activeStep ? 'step' : undefined}
+                    >
+                      {label}
+                    </li>
+                  ))}
+                </ol>
+                <div className="cfd-sidebar-status">
+                  <span className={`cfd-status-dot cfd-status-${cfdJobStatus}`} />
+                  <span>
+                    Job <code>{cfdJobId.slice(0, 8)}</code>
+                    {cfdJobStep ? ` · ${cfdJobStep}` : ''}
+                    {solving ? ` · ${cfdElapsed}s` : ''}
+                  </span>
+                  <button type="button" className="upload-reset" onClick={copyJobId}>
+                    {copied ? 'Copied' : 'Copy ID'}
+                  </button>
+                </div>
               </div>
             )}
 
-            {cfdError && <div className="upload-error">{cfdError}</div>}
+            {solving && (
+              <button type="button" className="upload-reset" onClick={onCfdCancel}>
+                Cancel (best effort)
+              </button>
+            )}
+
+            {cfdConnectionLost && !terminal && (
+              <div className="upload-error">
+                Connection lost to the local solver. The job may still be running.
+                <button type="button" className="upload-reset" onClick={onCfdRetryPoll}>Reconnect</button>
+              </div>
+            )}
+
+            {cfdError && (
+              <div className="upload-error">
+                {cfdError}
+                {cfdJobId ? ` · job ${cfdJobId.slice(0, 8)}` : ''}
+              </div>
+            )}
+
+            {(cfdJobStatus === 'failed' || cfdJobStatus === 'cancelled') && (
+              <button type="button" className="upload-btn upload-btn-full" onClick={onCfdRetry}>
+                Run again
+              </button>
+            )}
           </>
         ) : (
           <div className="flow-approx">
-            Static demo · bundled sample. For live solves, run{' '}
-            <code>docker compose up --build -d</code> on this machine, then{' '}
-            <button
-              type="button"
-              onClick={onBackendRetry}
-              className="upload-reset"
-            >
-              Connect
+            Static demo · sample wing. Connect a local solver to run a live solve.
+            <button type="button" onClick={onBackendRetry} className="upload-reset">
+              Connect local backend
             </button>
-            . The browser may ask for local network access.
+            <details className="self-host">
+              <summary>Self-host the solver</summary>
+              <p>
+                On the machine with the solver, run{' '}
+                <code>docker compose up --build -d</code>, then connect again. The
+                browser may ask for local network access.
+              </p>
+            </details>
           </div>
         )}
 
@@ -169,7 +253,7 @@ export function Sidebar({
           </button>
         ) : (
           <div className="cfd-sidebar-probe" aria-live="polite">
-            <span className="cfd-sidebar-probe-muted">No probe yet · click the 3D surface</span>
+            <span className="cfd-sidebar-probe-muted">No probe yet · use the probe station or click the 3D surface</span>
           </div>
         )}
       </div>
@@ -185,10 +269,14 @@ export function Sidebar({
           <span className="cad-status">Checking local editor…</span>
         ) : (
           <div className="cad-offline">
-            <span className="cad-status">
-              Not running. Start with <code>docker compose up -d</code>.
-            </span>
+            <span className="cad-status">Local CAD editor not detected.</span>
             <button type="button" className="upload-btn" onClick={onCadRetry}>Retry</button>
+            <details className="self-host">
+              <summary>Self-host the editor</summary>
+              <p>
+                Start the editor container with <code>docker compose up -d</code>.
+              </p>
+            </details>
           </div>
         )}
       </div>

@@ -1,9 +1,11 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { CfdVtkBoundary } from '../components/CfdVtkBoundary';
-import type { CfdField } from '../App';
+import { SolverStatus } from '../components/SolverStatus';
+import { LabCoachMark } from '../components/LabCoachMark';
 import type { CpPoint } from '../components/CpPolarChart';
-import { SAMPLE_LOWER, SAMPLE_UPPER, sectionNormalForce } from '../lib/cp';
-import { freeStream, formatRe, type ProbeSample } from '../lib/probe';
+import { SAMPLE_LOWER, SAMPLE_UPPER, sectionNormalForce, summarizeCp, type DerivedCp } from '../lib/cp';
+import { fallbackFields, resolveField, type FieldInfo } from '../lib/fields';
+import { fmtProbe, freeStream, formatRe, type ProbeSample } from '../lib/probe';
 
 const CfdVtkViewer = lazy(() =>
   import('../components/CfdVtkViewer').then((m) => ({ default: m.CfdVtkViewer }))
@@ -12,13 +14,17 @@ const CpPolarChart = lazy(() =>
   import('../components/CpPolarChart').then((m) => ({ default: m.CpPolarChart }))
 );
 
+type ViewerState = 'loading' | 'ready' | 'error';
+type CpSource = 'solver' | 'scene' | 'sample' | 'solver-missing';
+
 interface Props {
   backendOnline: boolean;
   solverAvailable: boolean;
-  field: CfdField;
-  onFieldChange: (field: CfdField) => void;
+  field: string;
+  onFieldChange: (field: string) => void;
   sceneLabel: string;
   cp?: { upper: CpPoint[]; lower: CpPoint[] };
+  cpFromJob?: boolean;
   chartNote?: string;
   rotationX: number;
   rotationY: number;
@@ -29,6 +35,7 @@ interface Props {
   jobStatus: string;
   speed: number;
   onProbe?: (sample: ProbeSample | null) => void;
+  lastProbe?: ProbeSample | null;
   focusRequest?: { sample: ProbeSample; nonce: number } | null;
 }
 
@@ -38,39 +45,92 @@ const FieldSkeleton = ({ label }: { label: string }) => (
 
 export function CfdLab({
   backendOnline, solverAvailable, field, onFieldChange,
-  sceneLabel, cp, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed, onProbe, focusRequest,
+  sceneLabel, cp, cpFromJob, chartNote, rotationX, rotationY, rotationZ, provenance, datasetUrl, jobId, jobStatus, speed, onProbe, lastProbe, focusRequest,
 }: Props) {
   const stream = freeStream(speed);
-  const sectionCn = cp
-    ? sectionNormalForce(cp.upper, cp.lower)
-    : chartNote
+
+  const [fields, setFields] = useState<FieldInfo[]>(fallbackFields);
+  const [datasetCp, setDatasetCp] = useState<DerivedCp | null>(null);
+  const activeField = resolveField(fields, field);
+
+  const usingSolverCp = Boolean(cpFromJob && datasetCp);
+  const effectiveCp = usingSolverCp ? datasetCp : cpFromJob ? undefined : cp;
+  const cpData = effectiveCp ?? { upper: SAMPLE_UPPER, lower: SAMPLE_LOWER };
+  const summary = summarizeCp(cpData.upper, cpData.lower);
+  const sectionCn = effectiveCp
+    ? sectionNormalForce(effectiveCp.upper, effectiveCp.lower)
+    : chartNote || cpFromJob
     ? undefined
     : sectionNormalForce(SAMPLE_UPPER, SAMPLE_LOWER);
+
+  const cpSource: CpSource = usingSolverCp
+    ? 'solver'
+    : cpFromJob
+    ? 'solver-missing'
+    : cp
+    ? 'scene'
+    : 'sample';
+  const chartTitle =
+    cpSource === 'solver'
+      ? 'Solved surface · Cp vs x/c'
+      : `${sceneLabel} · Cp vs x/c`;
+  const sourceText: Record<CpSource, string> = {
+    solver: 'Solved surface pressure, normalized to Cp: (p − p_ref) / (½·U_ref²).',
+    'solver-missing': 'The solved surface has no pressure field; showing the bundled sample.',
+    scene: 'Generated preview · synthetic Cp, not solver output.',
+    sample: 'Bundled sample · synthetic Cp, not solver output.',
+  };
+
+  const [viewerState, setViewerState] = useState<ViewerState>('loading');
+  const [slowLoad, setSlowLoad] = useState(false);
+  const [station, setStation] = useState(0.3);
+  const [stationNonce, setStationNonce] = useState(0);
+
+  useEffect(() => {
+    if (viewerState === 'ready') return;
+    const t = setTimeout(() => setSlowLoad(true), 12_000);
+    return () => clearTimeout(t);
+  }, [viewerState]);
+
+  const moveStation = (value: number) => {
+    setStation(value);
+    setStationNonce((n) => n + 1);
+  };
+
+  const probeStation = stationNonce > 0 ? { xc: station, nonce: stationNonce } : null;
+
+  const readings = lastProbe?.readings && lastProbe.readings.length > 0
+    ? lastProbe.readings
+    : [
+        { name: 'p', label: 'Pressure (p)', value: lastProbe ? lastProbe.p : Number.NaN },
+        { name: 'U', label: '|U|', value: lastProbe ? lastProbe.u : Number.NaN },
+        { name: 'T', label: 'Temperature (T)', value: lastProbe ? lastProbe.t : Number.NaN },
+      ];
+
   return (
     <section className="cfd-lab">
       <header className="cfd-lab-head">
         <h2>CFD Laboratory</h2>
         <div className="cfd-lab-status">
-          <span>
-            {backendOnline
-              ? solverAvailable
-                ? 'OpenFOAM ready'
-                : 'Solver unavailable · sample mesh'
-              : 'Static demo'}
-          </span>
+          <SolverStatus
+            status={backendOnline ? 'online' : 'offline'}
+            solverAvailable={solverAvailable}
+            variant="lab"
+          />
           <label className="cfd-lab-field">
             Field
             <select
-              value={field}
-              onChange={(e) => onFieldChange(e.target.value as CfdField)}
+              value={activeField}
+              onChange={(e) => onFieldChange(e.target.value)}
             >
-              <option value="p">Pressure (p)</option>
-              <option value="U">Velocity (U)</option>
-              <option value="T">Temperature (T)</option>
+              {fields.map((f) => (
+                <option key={f.name} value={f.name}>{f.label}</option>
+              ))}
             </select>
           </label>
         </div>
       </header>
+      <LabCoachMark />
       <div className="cfd-lab-freestream" aria-label="Free-stream conditions">
         <span title="Free-stream velocity">U∞ {stream.speed.toFixed(1)} m/s</span>
         <span title="Reference chord">c {stream.chord.toFixed(1)} m</span>
@@ -86,24 +146,111 @@ export function CfdLab({
       {jobId && (
         <div className="cfd-job-status">Job {jobId.slice(0, 8)} · {jobStatus}</div>
       )}
+      {viewerState !== 'ready' && (
+        <div className="cfd-loading" role="status" aria-live="polite">
+          <span className="cfd-loading-bar" aria-hidden="true" />
+          <span>
+            {viewerState === 'error'
+              ? 'The 3D viewer failed to load.'
+              : slowLoad
+              ? 'Still loading the 3D viewer…'
+              : 'Loading 3D viewer…'}
+          </span>
+          <button type="button" className="upload-reset" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </div>
+      )}
       <div className="cfd-lab-grid">
         <CfdVtkBoundary>
           <Suspense fallback={<FieldSkeleton label="VTK viewer" />}>
-            <CfdVtkViewer datasetUrl={datasetUrl} field={field} rotationX={rotationX} rotationY={rotationY} rotationZ={rotationZ} onProbe={onProbe} freeStream={stream} sectionCn={sectionCn} focusRequest={focusRequest} />
+            <CfdVtkViewer
+              datasetUrl={datasetUrl}
+              field={activeField}
+              rotationX={rotationX}
+              rotationY={rotationY}
+              rotationZ={rotationZ}
+              onProbe={onProbe}
+              onLoadState={setViewerState}
+              onFieldsChange={setFields}
+              onCpSample={setDatasetCp}
+              freeStream={stream}
+              sectionCn={sectionCn}
+              focusRequest={focusRequest}
+              probeStation={probeStation}
+            />
           </Suspense>
         </CfdVtkBoundary>
-        {cp ? (
-          <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
-            <CpPolarChart upper={cp.upper} lower={cp.lower} title={`${sceneLabel} · Cp vs x/c`} />
-          </Suspense>
-        ) : chartNote ? (
-          <div className="cfd-chart-note">{chartNote}</div>
-        ) : (
-          <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
-            <CpPolarChart />
-          </Suspense>
-        )}
+        <div className="cfd-chart-cell">
+          {effectiveCp ? (
+            <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
+              <CpPolarChart
+                upper={effectiveCp.upper}
+                lower={effectiveCp.lower}
+                title={chartTitle}
+              />
+            </Suspense>
+          ) : chartNote ? (
+            <div className="cfd-chart-note">{chartNote}</div>
+          ) : (
+            <Suspense fallback={<FieldSkeleton label="Cp chart" />}>
+              <CpPolarChart
+                upper={cpData.upper}
+                lower={cpData.lower}
+                title={chartTitle}
+              />
+            </Suspense>
+          )}
+          {!chartNote && (
+            <>
+              <p className="cfd-chart-source">{sourceText[cpSource]}</p>
+              <p className="cfd-chart-summary">
+                <span className="cfd-chart-summary-label">Chart summary</span> {summary.text}
+              </p>
+            </>
+          )}
+        </div>
       </div>
+
+      <div className="cfd-probe-panel">
+        <label className="cfd-station">
+          <span>Probe station x/c</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={station}
+            aria-valuetext={`x/c ${station.toFixed(2)}`}
+            onChange={(e) => moveStation(Number(e.target.value))}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveStation(Math.max(0, Number((station - 0.01).toFixed(2))));
+              } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                moveStation(Math.min(1, Number((station + 0.01).toFixed(2))));
+              }
+            }}
+          />
+          <span className="cfd-station-value">{station.toFixed(2)}</span>
+        </label>
+        <table className="cfd-probe-table">
+          <caption>Probe sample at station x/c {station.toFixed(2)}</caption>
+          <thead>
+            <tr><th scope="col">Quantity</th><th scope="col">Value</th></tr>
+          </thead>
+          <tbody>
+            {readings.map((r) => (
+              <tr key={r.name}>
+                <th scope="row">{r.label}</th>
+                <td>{Number.isFinite(r.value) ? fmtProbe(r.value) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <p className="cfd-lab-credit">
         {sceneLabel}
         {backendOnline ? '' : ' · static demo'}

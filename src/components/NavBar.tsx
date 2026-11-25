@@ -9,10 +9,12 @@ export function NavBar({ onToggleSidebar, sidebarOpen }: Props) {
       <div className="nav-left">
         <button
           type="button"
+          id="nav-burger"
           className="nav-burger"
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
           aria-expanded={sidebarOpen}
+          aria-controls="app-sidebar"
         >
           <span /><span /><span />
         </button>
