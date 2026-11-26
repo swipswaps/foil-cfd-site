@@ -96,30 +96,37 @@ def health():
     }
 
 
+def _run_tool(args: list[str], timeout: int) -> tuple[int, str, str]:
+    proc = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        out, err = proc.communicate()
+        return 124, (out or "") + f"\n[timed out after {timeout}s]\n", err or ""
+    return proc.returncode, out or "", err or ""
+
+
 def _run_solver(job_id: str, case_dir: Path) -> None:
     REGISTRY[job_id]["status"] = "running"
     log = []
     failure = ""
     try:
         if shutil.which("blockMesh"):
-            r = subprocess.run(
-                ["blockMesh", "-case", str(case_dir)],
-                capture_output=True, text=True, timeout=180,
-            )
-            log.append(f"--- blockMesh (rc={r.returncode}) ---\n{r.stdout}\n{r.stderr}")
+            rc, out, err = _run_tool(["blockMesh", "-case", str(case_dir)], 180)
+            log.append(f"--- blockMesh (rc={rc}) ---\n{out}\n{err}")
             (case_dir / "log.blockMesh").write_text(log[-1])
-            if r.returncode != 0:
-                failure = f"blockMesh exited with code {r.returncode}"
+            if rc != 0:
+                failure = f"blockMesh exited with code {rc}"
 
         if not failure and shutil.which("simpleFoam"):
-            r = subprocess.run(
-                ["simpleFoam", "-case", str(case_dir)],
-                capture_output=True, text=True, timeout=900,
-            )
-            log.append(f"--- simpleFoam (rc={r.returncode}) ---\n{r.stdout}\n{r.stderr}")
+            rc, out, err = _run_tool(["simpleFoam", "-case", str(case_dir)], 900)
+            log.append(f"--- simpleFoam (rc={rc}) ---\n{out}\n{err}")
             (case_dir / "log.simpleFoam").write_text(log[-1])
-            if r.returncode != 0:
-                failure = f"simpleFoam exited with code {r.returncode}"
+            if rc != 0:
+                failure = f"simpleFoam exited with code {rc}"
 
         (case_dir / "case.foam").write_text("FOAM 4.1")
 
