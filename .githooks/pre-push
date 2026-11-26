@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -o pipefail
+repo=$(git rev-parse --show-toplevel)
+exec python3 "$repo/.github/scripts/source_guard.py" "$repo"
