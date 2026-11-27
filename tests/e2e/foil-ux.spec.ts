@@ -317,6 +317,28 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(page.locator('.cfd-sidebar-probe')).toContainText(/No probe yet/);
   });
 
+  test('probe station button samples the station and marks the Cp chart', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    await waitForLab(page);
+    await expect(page.locator('.cfd-chart .js-plotly-plot')).toBeVisible({ timeout: 15000 });
+
+    const table = page.locator('.cfd-probe-table');
+    await expect(table.locator('caption')).toContainText(/no sample yet/);
+    const chartNames = await page.evaluate(() => {
+      const el = document.querySelector('.cfd-chart .js-plotly-plot') as
+        | (Element & { data?: Array<{ name?: string }> })
+        | null;
+      return (el?.data ?? []).map((t) => t.name ?? '');
+    });
+    expect(chartNames).toContain('Probe station');
+
+    await page.getByRole('button', { name: 'Probe station' }).click();
+    await expect(table.locator('tbody tr').first().locator('td')).not.toHaveText('—', { timeout: 20000 });
+    await expect(table.locator('caption')).toContainText(/Probe sample/);
+  });
+
   test('velocity vectors overlay toggles and changes the render', async ({ page }) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -364,6 +386,21 @@ test.describe('3D lab UX (static, no backend)', () => {
           chBox.y + chBox.height <= cBox.y);
       expect(overlapMobile).toBe(false);
     }
+  });
+
+  test('phone lab tabs sit above the heading and the hero has one lab action', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(HOME, { waitUntil: 'load' });
+    await waitForLab(page);
+    const tabs = await page.locator('.hero-tabs').boundingBox();
+    const heading = await page.locator('.cfd-lab-head h2').boundingBox();
+    expect(tabs).not.toBeNull();
+    expect(heading).not.toBeNull();
+    expect((tabs?.y || 0) + (tabs?.height || 0)).toBeLessThanOrEqual((heading?.y || 0) + 1);
+    await page.getByRole('tab', { name: 'Overview' }).click();
+    await expect(page.locator('.hero-actions a')).toHaveCount(2);
+    await expect(page.locator('.hero-lab-preview')).toHaveCount(0);
   });
 
   test('selected NACA code drives the lab', async ({ page }) => {

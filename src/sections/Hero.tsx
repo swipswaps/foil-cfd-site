@@ -16,8 +16,6 @@ interface Props {
   lab: ReactNode;
 }
 
-const POSTER = `${import.meta.env.BASE_URL}demo/wing-poster.png`;
-
 export function Hero({ content, flow, speed, rotationX, rotationY, rotationZ, tab, onTabChange, onPrefetchLab, lab }: Props) {
   const overviewRef = useRef<HTMLButtonElement>(null);
   const labRef = useRef<HTMLButtonElement>(null);
@@ -95,10 +93,6 @@ export function Hero({ content, flow, speed, rotationX, rotationY, rotationZ, ta
               <a href="#cfd" className="hero-cta-primary" onPointerEnter={onPrefetchLab} onFocus={onPrefetchLab}>Open 3D CFD Lab ↓</a>
               <a href="#readme" className="hero-cta-secondary">Read the docs ↓</a>
             </div>
-            <a href="#cfd" className="hero-lab-preview" aria-label="Open the 3D CFD lab: Live sample wing · 3D lab" onPointerEnter={onPrefetchLab} onFocus={onPrefetchLab}>
-              <img src={POSTER} alt="3D CFD lab sample wing" loading="lazy" />
-              <span>Live sample wing · 3D lab</span>
-            </a>
           </div>
         </div>
       )}

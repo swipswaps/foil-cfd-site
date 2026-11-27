@@ -20,19 +20,45 @@ interface Props {
   upper?: CpPoint[];
   lower?: CpPoint[];
   title?: string;
+  station?: number;
 }
 
 /** A chordwise pressure-coefficient distribution (Cp vs x/c), not a polar. */
 export function CpDistributionChart({
   upper = SAMPLE_UPPER, lower = SAMPLE_LOWER,
   title = 'Pressure coefficient distribution (Cp vs x/c)',
+  station,
 }: Props) {
+  const stationLine =
+    typeof station === 'number' && Number.isFinite(station)
+      ? (() => {
+          const values = [...upper.map((p) => p.cp), ...lower.map((p) => p.cp)];
+          if (values.length === 0) return null;
+          return {
+            x: [station, station],
+            y: [Math.min(...values), Math.max(...values)],
+          };
+        })()
+      : null;
+
   return (
     <section className="cfd-chart">
       <Plot
         data={[
           { x: upper.map((p) => p.x), y: upper.map((p) => p.cp), type: 'scatter', mode: 'lines+markers', name: 'Upper', line: { width: 3, color: '#5BC0EB' } },
           { x: lower.map((p) => p.x), y: lower.map((p) => p.cp), type: 'scatter', mode: 'lines+markers', name: 'Lower', line: { width: 3, color: '#F4A261' } },
+          ...(stationLine
+            ? [{
+                x: stationLine.x,
+                y: stationLine.y,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Probe station',
+                line: { width: 1, color: '#38BDF8', dash: 'dot' },
+                hoverinfo: 'skip',
+                showlegend: false,
+              }]
+            : []),
         ]}
         layout={{
           autosize: true,

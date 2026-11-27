@@ -246,6 +246,7 @@ export function CfdLab({
                 upper={effectiveCp.upper}
                 lower={effectiveCp.lower}
                 title={chartTitle}
+                station={station}
               />
             </Suspense>
           ) : chartNote ? (
@@ -256,6 +257,7 @@ export function CfdLab({
                 upper={cpData.upper}
                 lower={cpData.lower}
                 title={chartTitle}
+                station={station}
               />
             </Suspense>
           )}
@@ -293,8 +295,20 @@ export function CfdLab({
           />
           <span className="cfd-station-value">{station.toFixed(2)}</span>
         </label>
+        <button
+          type="button"
+          className="upload-btn cfd-probe-btn"
+          onClick={() => moveStation(station)}
+          aria-label="Probe station"
+        >
+          Probe
+        </button>
         <table className="cfd-probe-table">
-          <caption>Probe sample at station x/c {station.toFixed(2)}</caption>
+          <caption>
+            {lastProbe
+              ? `Probe sample at station x/c ${station.toFixed(2)}`
+              : `Probe station x/c ${station.toFixed(2)} · no sample yet`}
+          </caption>
           <thead>
             <tr><th scope="col">Quantity</th><th scope="col">Value</th></tr>
           </thead>
@@ -307,6 +321,11 @@ export function CfdLab({
             ))}
           </tbody>
         </table>
+        {!lastProbe && (
+          <p className="cfd-probe-hint">
+            Choose Probe, move the slider, or click the 3D surface to read p, |U|, and T.
+          </p>
+        )}
       </div>
 
       <details className="cfd-glossary">
