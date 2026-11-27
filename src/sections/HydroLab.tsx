@@ -152,7 +152,7 @@ function HydrofoilAssembly({ aoaDeg, speedKnots, cavitating }: { aoaDeg: number;
 }
 
 function CpCavitationChart({ stations, sigma, cavitating }: { stations: CpStation[]; sigma: number; cavitating: boolean }) {
-  const w = 540; const h = 230; const padL = 46; const padR = 16; const padT = 18; const padB = 30;
+  const w = 540; const h = 230; const padL = 46; const padR = 16; const padT = 30; const padB = 30;
   const innerW = w - padL - padR; const innerH = h - padT - padB;
   const minCp = Math.min(-3.0, -sigma - 0.4, ...stations.map((s) => s.cpUpper));
   const maxCp = 1.2;
@@ -165,19 +165,18 @@ function CpCavitationChart({ stations, sigma, cavitating }: { stations: CpStatio
   return (
     <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
       <rect x={0} y={0} width={w} height={h} rx={8} fill="#07192B" />
+      <line x1={padL + 4} y1={14} x2={padL + 22} y2={14} stroke={cavitating ? '#F97316' : '#FACC15'} strokeWidth={1.6} strokeDasharray="5 4" />
+      <text x={padL + 28} y={18} fill={cavitating ? '#FB923C' : '#FACC15'} fontSize="12">Cavitation limit (-σ = -{sigma.toFixed(2)})</text>
       {cavY > padT && <rect x={padL} y={padT} width={innerW} height={Math.min(innerH, Math.max(0, cavY - padT))} fill="rgba(249, 115, 22, 0.14)" />}
       <line x1={padL} y1={mapY(0)} x2={w - padR} y2={mapY(0)} stroke="#1E3A5F" strokeDasharray="3 3" />
       {cavY >= padT && cavY <= h - padB && (
-        <>
-          <line x1={padL} y1={cavY} x2={w - padR} y2={cavY} stroke={cavitating ? '#F97316' : '#FACC15'} strokeWidth={1.6} strokeDasharray="5 4" />
-          <text x={padL + 6} y={Math.max(padT + 12, cavY - 5)} fill="#FACC15" fontSize="10.5">Cavitation Limit (-σ = -{sigma.toFixed(2)})</text>
-        </>
+        <line x1={padL} y1={cavY} x2={w - padR} y2={cavY} stroke={cavitating ? '#F97316' : '#FACC15'} strokeWidth={1.6} strokeDasharray="5 4" />
       )}
       <path d={upperPath} fill="none" stroke="#38BDF8" strokeWidth={2.4} />
       <path d={lowerPath} fill="none" stroke="#34D399" strokeWidth={2} />
-      <text x={padL} y={h - 8} fill="#7FB6D4" fontSize="10.5">Leading Edge (x/c = 0)</text>
-      <text x={w - padR - 95} y={h - 8} fill="#7FB6D4" fontSize="10.5">Trailing Edge (1.0)</text>
-      <text x={8} y={padT + 10} fill="#7FB6D4" fontSize="10.5">-Cp</text>
+      <text x={padL} y={h - 8} fill="#7FB6D4" fontSize="12">Leading Edge (x/c = 0)</text>
+      <text x={w - padR - 108} y={h - 8} fill="#7FB6D4" fontSize="12">Trailing Edge (1.0)</text>
+      <text x={8} y={padT + 10} fill="#7FB6D4" fontSize="12">-Cp</text>
     </svg>
   );
 }
@@ -193,7 +192,7 @@ export function HydroApp() {
       <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.75rem', borderBottom: '1px solid #16324F', background: '#081829', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <strong style={{ fontSize: '1.15rem', letterSpacing: '0.04em', color: '#38BDF8' }}>HYDRO.FOIL.CFD</strong>
-          <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem', borderRadius: '999px', background: '#0F2942', color: '#7DD3FC' }}>Marine · e-Foil · AUV Hydrodynamics</span>
+          <span className="hydro-descriptor" style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem', borderRadius: '999px', background: '#0F2942', color: '#7DD3FC' }}>Marine · e-Foil · AUV Hydrodynamics</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.85rem' }}>
           <a href="./index.html" style={{ color: '#93C5FD', textDecoration: 'none' }}>← Core FOIL.CFD Hub</a>
@@ -209,7 +208,7 @@ export function HydroApp() {
       </header>
       <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
         <section style={{ marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '2.1rem', margin: '0 0 0.6rem', color: '#F0F9FF' }}>Cavitation-Safe Hydrofoil &amp; Subsea Wing Engineering</h1>
+          <h1 style={{ fontSize: 'clamp(1.55rem, 5vw, 2.1rem)', margin: '0 0 0.6rem', color: '#F0F9FF' }}>Cavitation-Safe Hydrofoil &amp; Subsea Wing Engineering</h1>
           <p style={{ maxWidth: '780px', color: '#94C3DF', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
             Screen e-foil wings, America&apos;s Cup T-foils, and AUV hydroplanes before cutting carbon or CNC tooling. Inspect 3D flow geometry, lift-to-drag polars, and cavitation inception margins in your browser. This page is a screening preview: the live solver, when you run it locally, currently solves the bundled 2D channel case, not a full 3D hydrofoil mesh.
           </p>

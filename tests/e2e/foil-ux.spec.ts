@@ -717,4 +717,15 @@ test.describe('3D lab UX (static, no backend)', () => {
     await expect(second.locator('.cfd-lab-field select')).toHaveValue('U');
     await second.close();
   });
+
+  test('hydro page header is compact on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(BASE + '/hydro.html', { waitUntil: 'load' });
+    await expect(page.getByRole('heading', { name: /Cavitation-Safe Hydrofoil/i })).toBeVisible();
+    await expect(page.locator('.hydro-descriptor')).toBeHidden();
+    await expect(page.getByText('Static preview mode')).toBeVisible();
+    const scrollW = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollW).toBeLessThanOrEqual(392);
+    await expect(page.locator('svg text', { hasText: /Cavitation limit/i }).first()).toBeVisible();
+  });
 });
